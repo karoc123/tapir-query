@@ -19,6 +19,31 @@ export interface ExecuteQueryRequest {
   offset?: number;
 }
 
+export interface StartQuerySessionRequest {
+  sql: string;
+}
+
+export interface QuerySessionResponse {
+  sessionId: string;
+  columns: string[];
+  totalRows: number;
+  elapsedMs: number;
+}
+
+export interface ReadQuerySessionChunkRequest {
+  sessionId: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CloseQuerySessionRequest {
+  sessionId: string;
+}
+
+export interface CloseQuerySessionResponse {
+  closed: boolean;
+}
+
 export interface QueryChunk {
   columns: string[];
   rows: QueryRow[];

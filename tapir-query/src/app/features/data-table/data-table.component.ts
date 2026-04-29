@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ScrollingModule } from "@angular/cdk/scrolling";
-import { afterRenderEffect, Component, computed, effect, inject, input, output } from "@angular/core";
+import { afterRenderEffect, Component, computed, inject, input, output } from "@angular/core";
 import { PerfService } from "../../infrastructure/perf.service";
 import { QueryRow } from "../../infrastructure/tauri-contracts";
 
@@ -23,11 +23,13 @@ export class DataTableComponent {
 
   readonly columns = input<string[]>([]);
   readonly rows = input<QueryRow[]>([]);
+  readonly totalRows = input<number>(0);
+  readonly windowStartOffset = input<number>(0);
   readonly loading = input<boolean>(false);
   readonly sortColumn = input<string | null>(null);
   readonly sortDirection = input<SortDirection | null>(null);
-  readonly visibleRowsChange = output<QueryRow[]>();
   readonly sortRequested = output<TableSortRequest>();
+  readonly viewportIndexChange = output<number>();
 
   readonly gridTemplateColumns = computed(() => {
     const count = Math.max(this.columns().length, 1);
@@ -36,15 +38,28 @@ export class DataTableComponent {
 
   readonly rowCountLabel = computed(() => `${this.rows().length.toLocaleString()} rows`);
 
-  constructor() {
-    effect(() => {
-      this.visibleRowsChange.emit(this.rows());
-    });
+  readonly rowIndexes = computed(() =>
+    Array.from({ length: this.totalRows() }, (_, index) => index),
+  );
 
+  constructor() {
     afterRenderEffect(() => {
       this.rows();
       this.perf.end("renderGrid");
     });
+  }
+
+  rowForIndex(rowIndex: number): QueryRow | null {
+    const localIndex = rowIndex - this.windowStartOffset();
+    if (localIndex < 0 || localIndex >= this.rows().length) {
+      return null;
+    }
+
+    return this.rows()[localIndex] ?? null;
+  }
+
+  onViewportIndexChanged(index: number): void {
+    this.viewportIndexChange.emit(index);
   }
 
   toggleSort(column: string): void {
@@ -65,7 +80,7 @@ export class DataTableComponent {
     return this.sortDirection() === "asc" ? "ASC" : "DESC";
   }
 
-  trackByIndex(index: number): number {
-    return index;
+  trackByAbsoluteIndex(_index: number, rowIndex: number): number {
+    return rowIndex;
   }
 }

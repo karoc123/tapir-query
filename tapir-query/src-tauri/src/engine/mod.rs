@@ -32,6 +32,15 @@ pub struct QueryChunk {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct QuerySession {
+    pub session_id: String,
+    pub columns: Vec<String>,
+    pub total_rows: usize,
+    pub elapsed_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExportResult {
     pub output_path: String,
     pub rows_written: u64,
@@ -59,6 +68,29 @@ pub trait CsvQueryEngine: Send + Sync {
         limit: usize,
         offset: usize,
     ) -> EngineResult<QueryChunk>;
+
+    fn start_query_session(
+        &self,
+        registered: &HashMap<String, RegisteredCsv>,
+        sql: &str,
+    ) -> EngineResult<QuerySession>;
+
+    fn read_query_session_chunk(
+        &self,
+        registered: &HashMap<String, RegisteredCsv>,
+        session_id: &str,
+        limit: usize,
+        offset: usize,
+    ) -> EngineResult<QueryChunk>;
+
+    fn close_query_session(
+        &self,
+        registered: &HashMap<String, RegisteredCsv>,
+        session_id: &str,
+    ) -> EngineResult<bool>;
+
+    fn clear_query_sessions(&self, registered: &HashMap<String, RegisteredCsv>)
+        -> EngineResult<()>;
 
     fn export_query_to_csv(
         &self,

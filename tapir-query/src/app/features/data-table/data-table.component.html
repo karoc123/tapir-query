@@ -23,16 +23,18 @@
       [itemSize]="38"
       minBufferPx="300"
       maxBufferPx="800"
+      (scrolledIndexChange)="onViewportIndexChanged($event)"
     >
       <div
         class="table-row"
         [style.gridTemplateColumns]="gridTemplateColumns()"
-        *cdkVirtualFor="let row of rows(); let rowIndex = index; trackBy: trackByIndex"
+        *cdkVirtualFor="let rowIndex of rowIndexes(); trackBy: trackByAbsoluteIndex"
         [class.loading-row]="loading()"
       >
+        @let row = rowForIndex(rowIndex);
         @for (column of columns(); track column) {
-          <span class="table-cell" [title]="row[column] ?? ''">
-            {{ row[column] ?? "" }}
+          <span class="table-cell" [title]="row?.[column] ?? ''">
+            {{ row?.[column] ?? "" }}
           </span>
         }
       </div>

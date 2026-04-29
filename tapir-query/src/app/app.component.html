@@ -106,10 +106,13 @@
         <app-data-table
           [columns]="columns()"
           [rows]="rows()"
+          [totalRows]="totalRowCount()"
+          [windowStartOffset]="windowStartOffset()"
           [loading]="loading()"
           [sortColumn]="activeSortColumn()"
           [sortDirection]="activeSortDirection()"
           (sortRequested)="onTableSortRequested($event)"
+          (viewportIndexChange)="onTableViewportIndexChanged($event)"
         />
       </section>
 

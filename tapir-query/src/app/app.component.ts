@@ -51,6 +51,8 @@ export class AppComponent implements OnDestroy {
   readonly queryError = this.queryService.queryError;
   readonly columns = this.queryService.columns;
   readonly rows = this.queryService.rows;
+  readonly totalRowCount = this.queryService.totalRowCount;
+  readonly windowStartOffset = this.queryService.windowStartOffset;
   readonly visibleRowCount = this.queryService.visibleRowCount;
   readonly lastQueryElapsedMs = this.queryService.lastQueryElapsedMs;
   readonly statusMessage = this.queryService.statusMessage;
@@ -199,6 +201,10 @@ export class AppComponent implements OnDestroy {
 
   onTableSortRequested(request: TableSortRequest): Promise<void> {
     return this.queryService.sortByEntireTableColumn(request.column, request.direction);
+  }
+
+  onTableViewportIndexChanged(index: number): void {
+    this.queryService.onViewportIndexChange(index);
   }
 
   onColumnSelected(columnName: string): void {

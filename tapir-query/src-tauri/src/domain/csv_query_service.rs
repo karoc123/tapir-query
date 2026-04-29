@@ -1,5 +1,7 @@
 use crate::engine::sql_builder;
-use crate::engine::{ColumnSchema, CsvQueryEngine, ExportResult, QueryChunk, RegisteredCsv};
+use crate::engine::{
+    ColumnSchema, CsvQueryEngine, ExportResult, QueryChunk, QuerySession, RegisteredCsv,
+};
 use crate::error::{AppError, AppResult};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -29,6 +31,10 @@ impl CsvQueryService {
 
     pub fn open_file(&self, file_path: &str) -> AppResult<OpenedFile> {
         info!("csv_query_service open_file path={file_path}");
+
+        // Query sessions are tied to the previous result set and must be removed when
+        // opening a new file.
+        self.clear_query_sessions()?;
 
         let mut registry = self
             .registry
@@ -64,20 +70,49 @@ impl CsvQueryService {
         })
     }
 
-    pub fn execute_query(
+    pub fn execute_query(&self, sql: &str, limit: usize, offset: usize) -> AppResult<QueryChunk> {
+        let registry = self.snapshot_registry()?;
+        debug!(
+            "csv_query_service execute_query registry_size={}",
+            registry.len()
+        );
+        self.engine
+            .execute_query_chunk(&registry, sql, limit, offset)
+    }
+
+    pub fn start_query_session(&self, sql: &str) -> AppResult<QuerySession> {
+        let registry = self.snapshot_registry()?;
+        self.engine.clear_query_sessions(&registry)?;
+        self.engine.start_query_session(&registry, sql)
+    }
+
+    pub fn read_query_session_chunk(
         &self,
-        sql: &str,
+        session_id: &str,
         limit: usize,
         offset: usize,
     ) -> AppResult<QueryChunk> {
         let registry = self.snapshot_registry()?;
-        debug!("csv_query_service execute_query registry_size={}", registry.len());
-        self.engine.execute_query_chunk(&registry, sql, limit, offset)
+        self.engine
+            .read_query_session_chunk(&registry, session_id, limit, offset)
+    }
+
+    pub fn close_query_session(&self, session_id: &str) -> AppResult<bool> {
+        let registry = self.snapshot_registry()?;
+        self.engine.close_query_session(&registry, session_id)
+    }
+
+    pub fn clear_query_sessions(&self) -> AppResult<()> {
+        let registry = self.snapshot_registry()?;
+        self.engine.clear_query_sessions(&registry)
     }
 
     pub fn export_query_to_csv(&self, sql: &str, output_path: &str) -> AppResult<ExportResult> {
         let registry = self.snapshot_registry()?;
-        debug!("csv_query_service export_query registry_size={}", registry.len());
+        debug!(
+            "csv_query_service export_query registry_size={}",
+            registry.len()
+        );
         self.engine.export_query_to_csv(&registry, sql, output_path)
     }
 

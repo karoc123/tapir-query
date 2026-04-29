@@ -1,12 +1,17 @@
 import { Injectable } from "@angular/core";
 import { invoke } from "@tauri-apps/api/core";
 import {
+  CloseQuerySessionRequest,
+  CloseQuerySessionResponse,
   ExecuteQueryRequest,
   ExportCsvRequest,
   ExportCsvResponse,
   ExportRowsRequest,
   OpenFileResponse,
+  QuerySessionResponse,
   QueryChunk,
+  ReadQuerySessionChunkRequest,
+  StartQuerySessionRequest,
 } from "./tauri-contracts";
 import { LogService } from "./log.service";
 import { PerfService } from "./perf.service";
@@ -28,6 +33,24 @@ export class TauriBridgeService {
 
   executeQuery(payload: ExecuteQueryRequest): Promise<QueryChunk> {
     return this.invokeWithLogging<QueryChunk>("execute_query", {
+      request: payload,
+    });
+  }
+
+  startQuerySession(payload: StartQuerySessionRequest): Promise<QuerySessionResponse> {
+    return this.invokeWithLogging<QuerySessionResponse>("start_query_session", {
+      request: payload,
+    });
+  }
+
+  readQuerySessionChunk(payload: ReadQuerySessionChunkRequest): Promise<QueryChunk> {
+    return this.invokeWithLogging<QueryChunk>("read_query_session_chunk", {
+      request: payload,
+    });
+  }
+
+  closeQuerySession(payload: CloseQuerySessionRequest): Promise<CloseQuerySessionResponse> {
+    return this.invokeWithLogging<CloseQuerySessionResponse>("close_query_session", {
       request: payload,
     });
   }

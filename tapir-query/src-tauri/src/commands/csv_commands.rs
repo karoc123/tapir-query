@@ -33,6 +33,41 @@ pub struct ExecuteQueryRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct StartQuerySessionRequest {
+    pub sql: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartQuerySessionResponse {
+    pub session_id: String,
+    pub columns: Vec<String>,
+    pub total_rows: usize,
+    pub elapsed_ms: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadQuerySessionChunkRequest {
+    pub session_id: String,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloseQuerySessionRequest {
+    pub session_id: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloseQuerySessionResponse {
+    pub closed: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ExportCsvRequest {
     pub sql: String,
     pub output_path: String,
@@ -92,8 +127,7 @@ pub fn execute_query(
 ) -> Result<crate::engine::QueryChunk, String> {
     info!(
         "execute_query request received limit={:?} offset={:?}",
-        request.limit,
-        request.offset
+        request.limit, request.offset
     );
 
     state
@@ -103,6 +137,62 @@ pub fn execute_query(
             request.limit.unwrap_or(200),
             request.offset.unwrap_or(0),
         )
+        .map_err(map_error)
+}
+
+#[tauri::command]
+pub fn start_query_session(
+    request: StartQuerySessionRequest,
+    state: State<'_, AppState>,
+) -> Result<StartQuerySessionResponse, String> {
+    info!("start_query_session request received");
+
+    state
+        .csv_service
+        .start_query_session(&request.sql)
+        .map(|session| StartQuerySessionResponse {
+            session_id: session.session_id,
+            columns: session.columns,
+            total_rows: session.total_rows,
+            elapsed_ms: session.elapsed_ms,
+        })
+        .map_err(map_error)
+}
+
+#[tauri::command]
+pub fn read_query_session_chunk(
+    request: ReadQuerySessionChunkRequest,
+    state: State<'_, AppState>,
+) -> Result<crate::engine::QueryChunk, String> {
+    info!(
+        "read_query_session_chunk request received session={} limit={:?} offset={:?}",
+        request.session_id, request.limit, request.offset
+    );
+
+    state
+        .csv_service
+        .read_query_session_chunk(
+            &request.session_id,
+            request.limit.unwrap_or(200),
+            request.offset.unwrap_or(0),
+        )
+        .map_err(map_error)
+}
+
+#[tauri::command]
+pub fn close_query_session(
+    request: CloseQuerySessionRequest,
+    state: State<'_, AppState>,
+) -> Result<CloseQuerySessionResponse, String> {
+    info!(
+        "close_query_session request received session={}",
+        request.session_id
+    );
+
+    state
+        .csv_service
+        .close_query_session(&request.session_id)
+        .map(|closed| CloseQuerySessionResponse { closed })
         .map_err(map_error)
 }
 
@@ -137,7 +227,9 @@ pub fn export_rows(
 
     if request.columns.is_empty() {
         warn!("export_rows rejected because no columns were provided");
-        return Err(String::from("validation error: no columns available to export"));
+        return Err(String::from(
+            "validation error: no columns available to export",
+        ));
     }
 
     let target_path = PathBuf::from(&request.output_path);

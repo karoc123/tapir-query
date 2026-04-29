@@ -1,15 +1,23 @@
 import {
+  CloseQuerySessionRequest,
+  CloseQuerySessionResponse,
   ExecuteQueryRequest,
   ExportCsvRequest,
   ExportCsvResponse,
   ExportRowsRequest,
   OpenFileResponse,
+  QuerySessionResponse,
   QueryChunk,
+  ReadQuerySessionChunkRequest,
+  StartQuerySessionRequest,
 } from "../infrastructure/tauri-contracts";
 
 export class MockTauriService {
   openFileCalls: string[] = [];
   executeQueryCalls: ExecuteQueryRequest[] = [];
+  startQuerySessionCalls: StartQuerySessionRequest[] = [];
+  readQuerySessionChunkCalls: ReadQuerySessionChunkRequest[] = [];
+  closeQuerySessionCalls: CloseQuerySessionRequest[] = [];
   exportCsvCalls: ExportCsvRequest[] = [];
   exportRowsCalls: ExportRowsRequest[] = [];
 
@@ -33,6 +41,17 @@ export class MockTauriService {
     elapsedMs: 4,
   };
 
+  sessionResult: QuerySessionResponse = {
+    sessionId: "session-1",
+    columns: ["amount", "currency"],
+    totalRows: 1,
+    elapsedMs: 4,
+  };
+
+  closeSessionResult: CloseQuerySessionResponse = {
+    closed: true,
+  };
+
   exportResult: ExportCsvResponse = {
     outputPath: "exports/query-results.csv",
     rowsWritten: 1,
@@ -48,6 +67,23 @@ export class MockTauriService {
     return this.queryResult;
   }
 
+  async startQuerySession(payload: StartQuerySessionRequest): Promise<QuerySessionResponse> {
+    this.startQuerySessionCalls.push(payload);
+    return this.sessionResult;
+  }
+
+  async readQuerySessionChunk(payload: ReadQuerySessionChunkRequest): Promise<QueryChunk> {
+    this.readQuerySessionChunkCalls.push(payload);
+    return this.queryResult;
+  }
+
+  async closeQuerySession(
+    payload: CloseQuerySessionRequest,
+  ): Promise<CloseQuerySessionResponse> {
+    this.closeQuerySessionCalls.push(payload);
+    return this.closeSessionResult;
+  }
+
   async exportCsv(payload: ExportCsvRequest): Promise<ExportCsvResponse> {
     this.exportCsvCalls.push(payload);
     return this.exportResult;
@@ -61,6 +97,9 @@ export class MockTauriService {
   reset(): void {
     this.openFileCalls = [];
     this.executeQueryCalls = [];
+    this.startQuerySessionCalls = [];
+    this.readQuerySessionChunkCalls = [];
+    this.closeQuerySessionCalls = [];
     this.exportCsvCalls = [];
     this.exportRowsCalls = [];
   }

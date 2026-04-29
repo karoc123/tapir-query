@@ -46,11 +46,21 @@ describe("QueryService", () => {
     await service.openFile("/tmp/transactions.csv");
     await service.sortByEntireTableColumn("amount", "asc");
 
-    expect(bridgeMock.executeQueryCalls[1]).toEqual({
+    expect(bridgeMock.startQuerySessionCalls[1]).toEqual({
       sql: 'SELECT * FROM "transactions" ORDER BY "amount" ASC',
-      limit: 500,
+    });
+    expect(bridgeMock.readQuerySessionChunkCalls[1]).toEqual({
+      sessionId: "session-1",
+      limit: 1000,
       offset: 0,
     });
+    expect(bridgeMock.closeQuerySessionCalls[0]).toEqual({
+      sessionId: "session-1",
+    });
+    expect(bridgeMock.executeQueryCalls).toEqual([]);
+    expect(service.totalRowCount()).toBe(1);
+    expect(service.windowStartOffset()).toBe(0);
+    expect(service.rows().length).toBe(1);
     expect(service.activeSortColumn()).toBe("amount");
     expect(service.activeSortDirection()).toBe("asc");
   });
@@ -66,9 +76,15 @@ describe("QueryService", () => {
 
     expect(service.activeSortColumn()).toBeNull();
     expect(service.activeSortDirection()).toBeNull();
-    expect(bridgeMock.executeQueryCalls[2]).toEqual({
+    expect(bridgeMock.startQuerySessionCalls[1]).toEqual({
+      sql: 'SELECT * FROM "transactions" ORDER BY "amount" DESC',
+    });
+    expect(bridgeMock.startQuerySessionCalls[2]).toEqual({
       sql: "SELECT currency, COUNT(*) FROM transactions GROUP BY currency",
-      limit: 500,
+    });
+    expect(bridgeMock.readQuerySessionChunkCalls[2]).toEqual({
+      sessionId: "session-1",
+      limit: 1000,
       offset: 0,
     });
   });

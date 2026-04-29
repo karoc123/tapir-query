@@ -30,7 +30,9 @@ describe("AppComponent", () => {
     fixture.detectChanges();
 
     expect(bridgeMock.openFileCalls).toEqual(["/tmp/transactions.csv"]);
-    expect(bridgeMock.executeQueryCalls.length).toBe(1);
+    expect(bridgeMock.startQuerySessionCalls.length).toBe(1);
+    expect(bridgeMock.readQuerySessionChunkCalls.length).toBe(1);
+    expect(bridgeMock.executeQueryCalls.length).toBe(0);
     expect(component.rows().length).toBe(1);
     expect(component.columns()).toEqual(["amount", "currency"]);
     expect(component.queryError()).toBeNull();
@@ -44,7 +46,7 @@ describe("AppComponent", () => {
 
     await component.runQuery();
 
-    expect(bridgeMock.executeQueryCalls.length).toBe(0);
+    expect(bridgeMock.startQuerySessionCalls.length).toBe(0);
     expect(component.queryError()?.summary).toContain("Open a CSV file before running a query");
   });
 
