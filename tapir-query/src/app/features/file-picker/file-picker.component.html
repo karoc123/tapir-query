@@ -1,0 +1,8 @@
+<button
+  type="button"
+  class="picker-button"
+  [disabled]="disabled() || opening()"
+  (click)="selectCsvFile()"
+>
+  {{ opening() ? "Opening Picker..." : "Browse CSV (Recommended)" }}
+</button>

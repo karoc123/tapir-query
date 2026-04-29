@@ -1,0 +1,16 @@
+# Workspace build outputs
+**/.DS_Store
+**/Thumbs.db
+
+# Frontend artifacts
+/tapir-query/node_modules/
+/tapir-query/dist/
+/tapir-query/out-tsc/
+/tapir-query/.angular/
+/tapir-query/coverage/
+
+# Tauri/Rust build artifacts
+/tapir-query/src-tauri/target/
+
+# Generated helper assets
+/icon-square.png

@@ -1,53 +1,196 @@
-## 1. Kernziele & Anforderungen
-* **Performance:** Laden und Abfragen von CSV-Dateien > 1 GB in unter 2 Sekunden.
-* **Portabilität:** Native Binaries für Windows (x64) und Linux (x86_64/AARCH64). Keine Abhängigkeiten wie Java oder Python-Runtimes.
-* **Bedienung:** SQL-Eingabemaske für komplexe Abfragen und eine schnelle "Global Search".
-* **Ressourceneffizienz:** Niedriger RAM-Verbrauch durch Streaming-Verarbeitung.
+# Architecture: Tapir Query
 
----
+## 1. Scope and Goals
 
-## 2. Der Tech-Stack (Vorschlag)
-| Schicht | Technologie | Grund |
-| :--- | :--- | :--- |
-| **Framework** | **Tauri v2** | Kleinere Binaries und sicherer als Electron. |
-| **Sprache (Backend)** | **Rust** | Performance-Kritische Operationen & Typsicherheit. |
-| **Query Engine** | **DuckDB (Rust Crates)** | Industriestandard für analytische In-Process Abfragen. |
-| **Frontend UI** | **React + Tailwind CSS** | Schnelle Entwicklung der UI-Komponenten. |
-| **Data Grid** | **TanStack Table (Virtual)** | Flüssiges Scrollen durch Millionen von Datensätzen. |
-| **Editor** | **CodeMirror 6** | Für die SQL-Eingabe mit Syntax-Highlighting. |
+Tapir Query is a desktop-only, local-first analytics tool for CSV exploration.
 
----
+Primary goals:
 
-## 3. Funktionale Spezifikationen
+- Fast local query iteration on large CSV files.
+- Predictable memory behavior via pagination and virtualization.
+- Strict boundaries between UI, orchestration, and execution layers.
+- Explicit IPC contracts between Rust and TypeScript.
 
-### A. Daten-Import & Handling
-* **Auto-Schema-Detection:** DuckDB soll Datentypen (Integer, Date, String) automatisch erkennen.
-* **Delimiter-Support:** Automatische Erkennung von Komma, Semikolon, Tab und Pipe.
-* **Encoding:** Unterstützung für UTF-8 und ISO-8859-1 (wichtig für Windows-Altlasten).
+## 2. High-Level Runtime View
 
-### B. Query-Features
-* **Standard SQL:** `SELECT`, `WHERE`, `GROUP BY`, `JOIN` (über mehrere geöffnete CSVs hinweg!).
-* **Export:** Ergebnisse der SQL-Abfragen direkt als neue CSV oder JSON exportieren.
-* **History:** Speicherung der letzten 20 erfolgreichen Queries.
+```mermaid
+flowchart LR
+  UI[Angular 21 UI<br/>Standalone + Signals] --> Domain[Domain Services<br/>FileService / QueryService]
+  Domain --> Bridge[Tauri Bridge Service<br/>invoke wrapper]
+  Bridge --> Cmd[Tauri Commands<br/>open_file / execute_query / export_csv / export_rows]
+  Cmd --> Svc[CsvQueryService]
+  Svc --> Engine[DuckDbEngine]
+  Engine --> Pool[DuckDB Connection Pool]
+  Pool --> DuckDB[(Embedded DuckDB)]
+  DuckDB --> CSV[(Local CSV Files)]
+```
 
-### C. UI/UX Komponenten
-* **Sidebar:** Liste der geladenen Dateien und deren Spaltennamen (Schema-Browser).
-* **Main View:** Split-Screen (Oben: SQL-Editor, Unten: Result-Grid).
-* **Status Bar:** Anzeige von Dateigröße, Zeilenanzahl und Abfragezeit in Millisekunden.
+## 3. Backend Architecture (Rust + DuckDB)
 
----
+Module layout:
 
-## 4. Datenfluss-Architektur (Backend/Frontend)
-1.  **Event:** User droppt Datei -> Frontend sendet Pfad an Rust via `tauri::command`.
-2.  **Processing:** Rust öffnet eine DuckDB-Instanz und registriert die Datei als View.
-3.  **Query:** User sendet SQL -> Rust führt `duckdb.query()` aus.
-4.  **Transfer:** Ergebnisse werden als JSON-Chunks (oder effizienter via IPC-Binary) an das Frontend gestreamt.
-5.  **Rendering:** Das Virtual-Grid zeigt nur die sichtbaren Zeilen an.
+```text
+src-tauri/src/
+  commands/
+    csv_commands.rs
+  domain/
+    csv_query_service.rs
+  engine/
+    duckdb_engine.rs
+    sql_builder.rs
+    mod.rs
+  error.rs
+  lib.rs
+```
 
----
+Responsibilities:
 
-## 5. Meilensteine (MVP - Minimum Viable Product)
-1.  **Phase 1:** Tauri-Grundgerüst aufsetzen und DuckDB in Rust einbinden.
-2.  **Phase 2:** "Drag & Drop" von CSVs mit automatischer Tabellen-Vorschau.
-3.  **Phase 3:** SQL-Eingabefeld implementieren und Ergebnisse im Grid rendern.
-4.  **Phase 4:** Export-Funktion und Linux/Windows Build-Pipeline (GitHub Actions).
+- `commands`: Tauri command boundary and DTO entry points.
+- `domain`: orchestration and registry ownership.
+- `engine`: query execution abstraction and DuckDB implementation.
+- `error`: typed `AppError` categories (`Validation`, `Io`, `Sql`, `State`).
+
+### 3.1 DuckDB Connection Pooling
+
+`DuckDbEngine` uses a synchronized pool (`DuckDbPool`) of in-memory DuckDB `Connection` instances.
+
+- Pool size defaults to 4 and never drops below 1.
+- On each operation, the service acquires a pooled connection.
+- Registered CSV views are synchronized into that connection context.
+- Connection is returned to the pool by RAII drop (`PooledConnection`).
+
+This design reduces repeated connection creation overhead during iterative query sessions.
+
+## 4. Frontend Architecture (Angular 21 + Signals)
+
+Module layout:
+
+```text
+src/app/
+  domain/
+    file.service.ts
+    query.service.ts
+  infrastructure/
+    layout-state.service.ts
+    error-parsing.service.ts
+    tauri-bridge.service.ts
+    tauri-contracts.ts
+    log.service.ts
+    perf.service.ts
+    theme.service.ts
+  features/
+    file-picker/
+    drag-drop/
+    sql-editor/
+    data-table/
+    schema-sidebar/
+    cheat-sheet/
+    query-error-panel/
+    settings-panel/
+  app.component.*
+```
+
+State model:
+
+- `FileService` (Signals): current file path, table name, inferred schema.
+- `QueryService` (Signals): SQL text, rows, columns, pagination cursor, parsed errors, query timing, history.
+- `LayoutStateService` (Signals): empty/loaded mode, schema sidebar collapse state, cheat-sheet drawer state.
+- `ThemeService` (Signals): active theme + settings panel state with localStorage persistence.
+
+UI behavior:
+
+- Native file picker is the primary ingestion CTA (`@tauri-apps/plugin-dialog`) in empty mode.
+- Loaded mode uses a four-zone layout: action bar, collapsible schema rail, data grid, status bar.
+- SQL errors are parsed into DTOs and rendered inline directly under the editor.
+- Table rendering uses Angular CDK virtual scroll.
+
+## 5. IPC Protocol and Contracts
+
+Command surface:
+
+- `open_file`
+- `execute_query`
+- `export_csv`
+- `export_rows`
+
+### 5.1 Command-Level DTO Mapping (Rust ↔ TypeScript)
+
+| Command | Rust Request DTO | TS Request Contract | Rust Response DTO | TS Response Contract |
+| :--- | :--- | :--- | :--- | :--- |
+| `open_file` | `OpenFileRequest { file_path }` | invoke payload `{ request: { filePath } }` | `OpenFileResponse { table_name, file_path, columns, default_query, file_size_bytes }` | `OpenFileResponse { tableName, filePath, columns, defaultQuery, fileSizeBytes }` |
+| `execute_query` | `ExecuteQueryRequest { sql, limit, offset }` | `ExecuteQueryRequest` | `QueryChunk` | `QueryChunk` |
+| `export_csv` | `ExportCsvRequest { sql, output_path }` | `ExportCsvRequest` | `ExportCsvResponse` | `ExportCsvResponse` |
+| `export_rows` | `ExportRowsRequest { output_path, columns, rows }` | `ExportRowsRequest` | `ExportCsvResponse` | `ExportCsvResponse` |
+
+### 5.2 Field Naming Rules
+
+- Rust DTOs use snake_case fields.
+- Rust DTOs apply `#[serde(rename_all = "camelCase")]`.
+- TypeScript contracts are camelCase, matching serialized IPC payloads.
+
+Example mapping:
+
+- Rust `file_path` ↔ TypeScript `filePath`
+- Rust `rows_written` ↔ TypeScript `rowsWritten`
+
+### 5.3 Query Payload Characteristics
+
+- Query result rows are serialized as string-or-null cell values.
+- Pagination fields: `limit`, `offset`, `nextOffset`.
+- Engine execution timing is returned as `elapsedMs`.
+
+## 6. Observability and Benchmarking
+
+Frontend telemetry:
+
+- `PerfService` tracks bootup, file load, query roundtrip, query engine, and grid render timings.
+- Dashboard shows latest and average durations.
+
+Backend telemetry:
+
+- `tracing` + `tracing-subscriber` log command lifecycle and engine-level failures.
+
+Diagnostics:
+
+- `LogService` captures IPC errors, drag/drop handling, and state transition breadcrumbs.
+- App shell also logs raw native drag/drop events via Tauri webview event listener.
+
+## 7. Streaming and Memory Strategy
+
+- CSVs are exposed to DuckDB as views (not eagerly loaded into frontend memory).
+- Query results are page-based to keep IPC payload size bounded.
+- Virtualized table rendering keeps DOM size stable for large result sets.
+
+## 8. Desktop-Only Decision Record
+
+Decision:
+
+- Tapir Query remains desktop-only (Linux and Windows distribution targets).
+
+Consequences:
+
+- Mobile-specific generated assets and icon folders are removed.
+- Cleanup automation exists at `tapir-query/scripts/cleanup-desktop.sh`.
+- Architecture and release process are optimized for desktop bundle outputs only.
+
+## 9. Testing and Fixtures
+
+Backend:
+
+- Unit tests cover SQL builder and engine edge cases.
+- Real-world fixture test validates execution against downloaded sample CSVs.
+
+Frontend:
+
+- Jest test suites for app shell flow, query service behavior, and data table behavior.
+
+Fixtures:
+
+- Pull script: `tapir-query/tests/fixtures/pull-samples.mjs`
+- Download target: `tapir-query/tests/fixtures/downloads/`
+
+## 10. Release and Operational Readiness
+
+- Manual release workflow: `.github/workflows/release.yml` (`workflow_dispatch`).
+- Version synchronization is applied to `package.json`, `tauri.conf.json`, and `Cargo.toml`.
+- Linux and Windows artifacts are produced and uploaded to a draft GitHub release.

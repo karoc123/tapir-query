@@ -1,21 +1,134 @@
-<main class="container">
-  <h1>Welcome to Tauri + Angular!</h1>
+<main class="tapir-shell">
+  @if (isEmptyLayout()) {
+    <section class="empty-layout">
+      <div
+        tapirDragDrop
+        class="empty-drop-zone"
+        (fileDropped)="onFileDropped($event)"
+        (dropError)="onDropError($event)"
+      >
+        <p class="empty-kicker">Tapir Query</p>
+        <h1>Drop CSV here</h1>
+        <p class="empty-copy">Or use Browse Files to open a local dataset.</p>
 
-  <div class="row">
-    <a href="https://tauri.app" target="_blank">
-      <img src="/assets/tauri.svg" class="logo tauri" alt="Tauri logo" />
-    </a>
-    <a href="https://angular.io" target="_blank">
-      <img src="/assets/angular.svg" class="logo angular" alt="Angular logo" />
-    </a>
-  </div>
-  <p>Click on the logos to learn more about the frameworks</p>
+        <app-file-picker
+          [disabled]="loading()"
+          (fileSelected)="onManualFileSelected($event)"
+          (pickerError)="onDropError($event)"
+        />
 
-  <form class="row" (submit)="greet($event, greetInput.value)">
-    <input #greetInput id="greet-input" placeholder="Enter a name..." />
-    <button type="submit">Greet</button>
-  </form>
-  <p>{{ greetingMessage }}</p>
+        @if (loading()) {
+          <p class="empty-loading">Preparing preview...</p>
+        }
 
-  <router-outlet />
+        <app-query-error-panel [error]="queryError()" />
+      </div>
+    </section>
+  }
+
+  @if (isLoadedLayout()) {
+    <section class="loaded-layout" [class.with-sidebar]="!schemaCollapsed()">
+      <header class="zone-a action-bar">
+        <button
+          type="button"
+          class="sidebar-toggle"
+          (click)="toggleSchemaSidebar()"
+        >
+          {{ schemaToggleLabel() }}
+        </button>
+
+        <button
+          type="button"
+          class="file-pill file-picker-trigger"
+          [disabled]="loading()"
+          title="Open another CSV file"
+          (click)="onFileNameClicked()"
+        >
+          <span class="file-name">{{ currentFileName() ?? "Unknown file" }}</span>
+          <span class="file-meta">{{ currentFileSizeLabel() }}</span>
+        </button>
+
+        <div class="query-stack">
+          <app-sql-editor
+            [query]="query()"
+            [loading]="loading()"
+            [placeholder]="'Write SQL and press Ctrl/Cmd + Enter'"
+            (queryChange)="onQueryChanged($event)"
+            (runRequested)="runQuery()"
+          />
+
+          <app-query-error-panel [error]="queryError()" />
+
+          @if (showSlowLoadHint()) {
+            <p class="slow-load-indicator">Loading large result set...</p>
+          }
+        </div>
+
+        <div class="action-buttons">
+          <button type="button" class="action-button" [disabled]="loading()" (click)="exportResults()">Export</button>
+
+          <div class="icon-stack">
+            <button
+              type="button"
+              class="icon-button"
+              aria-label="Open settings"
+              title="Settings"
+              (click)="toggleSettings()"
+            >
+              &#9881;
+            </button>
+            <button
+              type="button"
+              class="icon-button"
+              aria-label="Open cheat sheet"
+              title="DuckDB cheat sheet"
+              (click)="toggleCheatSheet()"
+            >
+              ?
+            </button>
+          </div>
+        </div>
+      </header>
+
+      @if (!schemaCollapsed()) {
+        <aside class="zone-b schema-zone">
+          <app-schema-sidebar
+            [tableName]="currentTable()"
+            [filePath]="currentFilePath()"
+            [columns]="schemaColumns()"
+            [collapsed]="false"
+            (columnSelected)="onColumnSelected($event)"
+          />
+        </aside>
+      }
+
+      <section class="zone-c data-zone">
+        <app-data-table
+          [columns]="columns()"
+          [rows]="rows()"
+          [loading]="loading()"
+          [sortColumn]="activeSortColumn()"
+          [sortDirection]="activeSortDirection()"
+          (sortRequested)="onTableSortRequested($event)"
+        />
+      </section>
+
+      <footer class="zone-d status-bar">
+        {{ statusMessage() }} • {{ rowStatusLabel() }} • Query took {{ queryElapsedLabel() }}
+      </footer>
+    </section>
+  }
+
+  <app-cheat-sheet
+    [open]="cheatSheetOpen()"
+    (closeRequested)="closeCheatSheet()"
+  />
+
+  <app-settings-panel
+    [open]="settingsOpen()"
+    [activeTheme]="activeTheme()"
+    [options]="themeOptions()"
+    (closeRequested)="closeSettings()"
+    (themeSelected)="onThemeSelected($event)"
+  />
 </main>

@@ -1,0 +1,9 @@
+@if (error(); as queryError) {
+  <section class="query-error-panel" role="alert" aria-live="polite">
+    <p class="error-summary">{{ queryError.summary }}</p>
+
+    @if (queryError.sqlContext) {
+      <pre class="error-context">{{ queryError.sqlContext }}</pre>
+    }
+  </section>
+}

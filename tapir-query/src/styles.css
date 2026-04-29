@@ -1,1 +1,113 @@
-/* You can add global styles to this file, and also import other style files */
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap");
+@import "tailwindcss";
+
+:root {
+	color-scheme: light;
+
+	/* Core palette */
+	--tapir-bg-base: #f5f5f5;
+	--tapir-bg-panel: #fdfcfb;
+	--tapir-bg-panel-muted: #edf0f1;
+	--tapir-text-primary: #2c3e50;
+	--tapir-text-muted: #5d6d7e;
+	--tapir-accent: #5d6d7e;
+	--tapir-accent-strong: #3f5368;
+	--tapir-border: rgba(44, 62, 80, 0.24);
+	--tapir-border-soft: rgba(44, 62, 80, 0.12);
+	--tapir-border-strong: rgba(44, 62, 80, 0.52);
+	--tapir-panel-shadow: rgba(44, 62, 80, 0.12);
+	--tapir-panel-shadow-strong: rgba(44, 62, 80, 0.25);
+	--tapir-shell-bg:
+		radial-gradient(circle at 12% 16%, rgba(93, 109, 126, 0.2), transparent 38%),
+		radial-gradient(circle at 84% 14%, rgba(44, 62, 80, 0.1), transparent 34%),
+		linear-gradient(180deg, #f5f5f5 0%, #eceff1 46%, #f5f5f5 100%);
+	--tapir-drop-surface: rgba(255, 255, 255, 0.86);
+	--tapir-drop-active: rgba(218, 224, 229, 0.7);
+	--tapir-error-bg: #f5ece8;
+	--tapir-error-border: rgba(139, 88, 73, 0.45);
+	--tapir-error-text: #8b5849;
+
+	/* Semantic aliases used by existing components */
+	--tapir-body-bg: var(--tapir-bg-base);
+	--tapir-surface: var(--tapir-bg-panel);
+	--tapir-surface-alt: var(--tapir-bg-panel-muted);
+	--tapir-text: var(--tapir-text-primary);
+	--tapir-heading: var(--tapir-text-primary);
+	--tapir-muted: var(--tapir-text-muted);
+	--tapir-panel-bg: var(--tapir-bg-panel);
+	--tapir-panel-border: var(--tapir-border);
+	--tapir-drop-border: var(--tapir-border-strong);
+	--tapir-chip-bg: var(--tapir-accent-strong);
+	--tapir-chip-text: #f5f5f5;
+	--tapir-progress-track: rgba(44, 62, 80, 0.16);
+	--tapir-progress-bar: linear-gradient(90deg, #5d6d7e 0%, #8191a2 100%);
+	--tapir-fab-bg: var(--tapir-accent-strong);
+	--tapir-fab-hover-bg: #354759;
+	--tapir-fab-text: #f5f5f5;
+	--tapir-error-surface: var(--tapir-error-bg);
+}
+
+:root[data-theme="dark-banking"] {
+	color-scheme: dark;
+	--tapir-bg-base: #2c3e50;
+	--tapir-bg-panel: #31465c;
+	--tapir-bg-panel-muted: #3a5168;
+	--tapir-text-primary: #e8eef2;
+	--tapir-text-muted: #b3c2ce;
+	--tapir-accent: #9eacb8;
+	--tapir-accent-strong: #c3ced7;
+	--tapir-border: rgba(232, 238, 242, 0.24);
+	--tapir-border-soft: rgba(232, 238, 242, 0.12);
+	--tapir-border-strong: rgba(232, 238, 242, 0.5);
+	--tapir-panel-shadow: rgba(8, 16, 23, 0.38);
+	--tapir-panel-shadow-strong: rgba(8, 16, 23, 0.55);
+	--tapir-shell-bg:
+		radial-gradient(circle at 18% 16%, rgba(191, 203, 213, 0.16), transparent 36%),
+		radial-gradient(circle at 85% 12%, rgba(137, 158, 176, 0.2), transparent 34%),
+		linear-gradient(180deg, #2c3e50 0%, #304457 52%, #2a3a4b 100%);
+	--tapir-drop-surface: rgba(58, 81, 104, 0.88);
+	--tapir-drop-active: rgba(83, 108, 131, 0.86);
+	--tapir-error-bg: rgba(122, 76, 63, 0.42);
+	--tapir-error-border: rgba(227, 183, 168, 0.45);
+	--tapir-error-text: #ffd8cb;
+
+	--tapir-body-bg: var(--tapir-bg-base);
+	--tapir-surface: var(--tapir-bg-panel);
+	--tapir-surface-alt: var(--tapir-bg-panel-muted);
+	--tapir-text: var(--tapir-text-primary);
+	--tapir-heading: var(--tapir-text-primary);
+	--tapir-muted: var(--tapir-text-muted);
+	--tapir-panel-bg: var(--tapir-bg-panel);
+	--tapir-panel-border: var(--tapir-border);
+	--tapir-drop-border: var(--tapir-border-strong);
+	--tapir-chip-bg: var(--tapir-accent-strong);
+	--tapir-chip-text: #1e2b38;
+	--tapir-progress-track: rgba(232, 238, 242, 0.2);
+	--tapir-progress-bar: linear-gradient(90deg, #9eacb8 0%, #d4dee6 100%);
+	--tapir-fab-bg: #4a6076;
+	--tapir-fab-hover-bg: #5a7085;
+	--tapir-fab-text: #eff4f7;
+	--tapir-error-surface: var(--tapir-error-bg);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	min-height: 100%;
+	font-family: "Manrope", "Segoe UI", sans-serif;
+	color: var(--tapir-text);
+	background-color: var(--tapir-body-bg);
+	transition: color 220ms ease, background-color 220ms ease;
+}
+
+button,
+input,
+textarea,
+select {
+	font: inherit;
+	color: inherit;
+}

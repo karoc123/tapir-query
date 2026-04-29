@@ -1,0 +1,80 @@
+.table-shell {
+  height: 100%;
+  min-height: 21rem;
+  border: 1px solid var(--tapir-border);
+  border-radius: 0.9rem;
+  background: var(--tapir-surface);
+  overflow: hidden;
+}
+
+.table-empty {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--tapir-text-muted);
+  font-size: 0.8rem;
+}
+
+.table-header {
+  display: grid;
+  gap: 0;
+  border-bottom: 1px solid var(--tapir-border);
+  overflow: hidden;
+}
+
+.table-head-cell {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  background: color-mix(in srgb, var(--tapir-accent) 5%, var(--tapir-surface-alt));
+  border-right: 1px solid var(--tapir-border-soft);
+  padding: 0.6rem 0.7rem;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--tapir-text-primary);
+}
+
+.table-head-cell:last-child {
+  border-right: none;
+}
+
+.table-viewport {
+  height: calc(100% - 2.3rem);
+  min-height: 18rem;
+  background: var(--tapir-surface);
+}
+
+.table-row {
+  display: grid;
+  border-bottom: 1px solid var(--tapir-border-soft);
+  font-size: 0.77rem;
+  transition: background-color 100ms ease;
+}
+
+.table-row:nth-child(odd) {
+  background-color: color-mix(in srgb, var(--tapir-accent) 2%, var(--tapir-surface));
+}
+
+.table-row:hover {
+  background: color-mix(in srgb, var(--tapir-accent) 9%, var(--tapir-surface));
+}
+
+.table-cell {
+  border-right: 1px solid var(--tapir-border-soft);
+  padding: 0.52rem 0.7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tapir-text-primary);
+}
+
+.table-cell:last-child {
+  border-right: none;
+}
+
+.loading-row {
+  opacity: 0.68;
+}

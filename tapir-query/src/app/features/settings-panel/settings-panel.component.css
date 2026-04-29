@@ -1,0 +1,106 @@
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(15, 23, 42, 0.28);
+  backdrop-filter: blur(2px);
+}
+
+.settings-panel {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  width: min(26rem, calc(100vw - 2rem));
+  z-index: 90;
+  border-radius: 1rem;
+  border: 1px solid var(--tapir-border-strong);
+  background: var(--tapir-surface);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.2);
+  padding: 0.95rem;
+  animation: panel-enter 180ms ease-out;
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.8rem;
+}
+
+.settings-header h3 {
+  margin: 0;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--tapir-heading);
+}
+
+.close-button {
+  border: 1px solid var(--tapir-border);
+  border-radius: 0.55rem;
+  background: var(--tapir-surface-alt);
+  color: var(--tapir-text);
+  font-size: 0.67rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  padding: 0.34rem 0.5rem;
+}
+
+.section-title {
+  margin: 0 0 0.45rem;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--tapir-muted);
+}
+
+.theme-grid {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.theme-card {
+  border: 1px solid var(--tapir-border);
+  border-radius: 0.75rem;
+  background: var(--tapir-surface-alt);
+  color: inherit;
+  text-align: left;
+  padding: 0.6rem 0.65rem;
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+.theme-card:hover {
+  border-color: var(--tapir-border-strong);
+  transform: translateY(-1px);
+}
+
+.theme-card.active {
+  border-color: var(--tapir-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tapir-accent) 32%, transparent);
+}
+
+.theme-name {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--tapir-heading);
+}
+
+.theme-description {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.72rem;
+  color: var(--tapir-muted);
+}
+
+@keyframes panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

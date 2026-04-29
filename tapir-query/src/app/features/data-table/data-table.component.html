@@ -1,0 +1,41 @@
+<section class="table-shell">
+  @if (columns().length === 0) {
+    <div class="table-empty">
+      Open a CSV file and execute a query to render rows.
+    </div>
+  } @else {
+    <div class="table-header" [style.gridTemplateColumns]="gridTemplateColumns()">
+      @for (column of columns(); track column) {
+        <button
+          type="button"
+          class="table-head-cell"
+          (click)="toggleSort(column)"
+          [title]="'Sort by ' + column"
+        >
+          <span>{{ column }}</span>
+          <span class="text-slate-400">{{ sortIndicator(column) }}</span>
+        </button>
+      }
+    </div>
+
+    <cdk-virtual-scroll-viewport
+      class="table-viewport"
+      [itemSize]="38"
+      minBufferPx="300"
+      maxBufferPx="800"
+    >
+      <div
+        class="table-row"
+        [style.gridTemplateColumns]="gridTemplateColumns()"
+        *cdkVirtualFor="let row of rows(); let rowIndex = index; trackBy: trackByIndex"
+        [class.loading-row]="loading()"
+      >
+        @for (column of columns(); track column) {
+          <span class="table-cell" [title]="row[column] ?? ''">
+            {{ row[column] ?? "" }}
+          </span>
+        }
+      </div>
+    </cdk-virtual-scroll-viewport>
+  }
+</section>

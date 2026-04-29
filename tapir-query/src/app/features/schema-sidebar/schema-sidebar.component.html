@@ -1,0 +1,31 @@
+<section class="schema-shell" [class.collapsed]="collapsed()">
+  @if (!collapsed()) {
+    <header class="schema-header">
+      <h2>Schema</h2>
+      <p>{{ tableName() ? tableName() : "No table loaded" }}</p>
+      @if (filePath()) {
+        <p class="file-path" [title]="filePath()!">{{ filePath() }}</p>
+      }
+    </header>
+
+    @if (columns().length === 0) {
+      <p class="schema-empty">Load a CSV to inspect inferred columns.</p>
+    } @else {
+      <ul class="column-list">
+        @for (column of columns(); track column.name) {
+          <li>
+            <button
+              type="button"
+              class="column-item"
+              [title]="'Insert ' + column.name"
+              (click)="selectColumn(column.name)"
+            >
+              <span class="column-name">{{ column.name }}</span>
+              <span class="column-type">{{ column.dataType }}</span>
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  }
+</section>

@@ -21,6 +21,5 @@
     "strictInputAccessModifiers": true,
     "typeCheckHostBindings": true,
     "strictTemplates": true
-  },
-  "references": [{ "path": "./tsconfig.app.json" }]
+  }
 }

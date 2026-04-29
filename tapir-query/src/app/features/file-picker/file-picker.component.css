@@ -1,0 +1,24 @@
+.picker-button {
+  margin-top: 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--tapir-accent) 75%, var(--tapir-border));
+  border-radius: 0.72rem;
+  background: color-mix(in srgb, var(--tapir-accent) 84%, var(--tapir-surface-alt));
+  color: #f8fafc;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 0.55rem 0.8rem;
+  transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.picker-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tapir-accent-strong) 88%, var(--tapir-surface-alt));
+  border-color: var(--tapir-border-strong);
+  transform: translateY(-1px);
+}
+
+.picker-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

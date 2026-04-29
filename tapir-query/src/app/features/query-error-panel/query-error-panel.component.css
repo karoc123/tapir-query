@@ -1,0 +1,38 @@
+.query-error-panel {
+  border: 1px solid var(--tapir-error-border);
+  border-radius: 0.75rem;
+  background: var(--tapir-error-bg);
+  color: var(--tapir-error-text);
+  padding: 0.55rem 0.65rem;
+  animation: fade-in 220ms ease;
+}
+
+.error-summary {
+  margin: 0;
+  font-size: 0.77rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.error-context {
+  margin: 0.45rem 0 0;
+  padding: 0.45rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--tapir-error-border);
+  background: color-mix(in srgb, var(--tapir-error-bg) 80%, white);
+  font-size: 0.7rem;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

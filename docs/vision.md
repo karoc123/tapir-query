@@ -1,33 +1,52 @@
 # Vision Document: Tapir Query
 
 ## 1. Executive Summary
-**Tapir Query** is an open-source, high-performance CSV analysis tool designed for professionals who need to explore, query, and transform large datasets without the overhead of heavy BI software. Built with Rust and DuckDB, it serves as a lightweight, cross-platform alternative to legacy plugins, offering a "no-nonsense" approach to data inspection.
 
-## 2. Core Philosophy: The "Unexcited" Tool
-In an era of bloated software and complex cloud platforms, Tapir Query follows the philosophy of an **unexcited tool**:
-* **Quiet & Reliable:** It starts instantly and performs predictably.
-* **Local-First:** Data stays on the machine—critical for sensitive banking and financial environments.
-* **Focused:** It doesn't try to be a spreadsheet or a database manager; it is a lens for CSV data.
+Tapir Query is an open-source, high-performance CSV analysis application for professionals who need to inspect and transform large flat files without heavyweight BI platforms. It combines Rust, DuckDB, Tauri v2, and Angular (Standalone + Signals) to deliver a fast, strict, and maintainable desktop tool.
 
-## 3. Target Audience
-* **Financial Analysts:** Users who deal with massive transaction logs and reconciliation files.
-* **Software Engineers:** Developers needing a quick SQL interface for local flat files.
-* **Data Auditors:** Professionals requiring a fast way to validate data integrity across millions of rows.
+## 2. Product Philosophy: The Unexcited Tool
 
-## 4. Key Capabilities
-### Current Focus (MVP)
-* **High-Velocity Ingestion:** Loading gigabyte-scale CSVs in seconds using DuckDB’s vectorized engine.
-* **SQL-Powered Exploration:** Full SQL support (SELECT, JOIN, GROUP BY) to query CSVs as if they were relational databases.
-* **Cross-Platform Consistency:** A unified experience across Linux and Windows via Tauri.
-* **Seamless Export:** Refining data through queries and exporting the results back to clean CSV files.
+Tapir Query follows the philosophy of an unexcited tool: calm, predictable, and focused.
 
-### Future Roadmap
-* **Frequency Analysis:** One-click statistics for column distributions and outliers.
-* **Lightweight Visualization:** Instant, unbloated charts (Bar, Line, Scatter) to identify patterns visually.
-* **Schema Inference:** Smart detection of types, dates, and currencies tailored for financial datasets.
+- Quiet and reliable: Startup and query execution should feel instant for common workflows.
+- Local-first by default: Sensitive data never needs to leave the machine.
+- Operational focus: It is not a spreadsheet replacement, but a precise lens for CSV data quality and exploration.
 
-## 5. Technical Excellence
-By leveraging **Rust** for safety and speed, **Tauri** for a slim desktop footprint, and **DuckDB** for analytical power, Tapir Query aims to outperform existing text-editor plugins while providing a modern, developer-friendly interface.
+## 3. Target Users
 
-## 6. Open Source & Community
-Tapir Query is built to be extended. As an open-source project, it encourages transparency—a vital trait for tools used in infrastructure-critical sectors like banking.
+- Financial analysts working with reconciliation logs, booking exports, and transaction archives.
+- Software engineers who need SQL over local files for debugging and data checks.
+- Data auditors validating consistency and integrity over millions of rows.
+
+## 4. MVP Capabilities
+
+- High-velocity ingestion: Register and scan gigabyte-scale CSV files through DuckDB.
+- Native desktop file picking: Select CSV files via OS dialog in addition to drag-and-drop.
+- SQL-first exploration: Run ad hoc SQL (`SELECT`, `WHERE`, `GROUP BY`, `JOIN`) against loaded files.
+- Chunked result handling: Stream query results in predictable pages to keep memory stable.
+- Cross-platform desktop delivery: Consistent behavior across Linux and Windows with Tauri v2.
+- Fast export workflow: Persist filtered query results into new CSV artifacts.
+
+## 5. Design Principles
+
+- Local-first data handling: All parsing, querying, and export operations run on the local host process.
+- Deterministic behavior: Explicit query execution, clear loading states, and measured response times.
+- Strict architecture: Separation of concerns between UI components, frontend infrastructure services, and backend engine modules.
+- Performance aware UX: Virtualized tables and paged IPC transfer to avoid UI freezes.
+
+## 6. Technical Direction
+
+- Backend: Rust command layer with a trait-driven DuckDB engine wrapper.
+- Frontend: Angular latest (Standalone APIs + Signals) with typed service boundaries.
+- UI personalization: persisted theme profiles with a lightweight settings surface.
+- Runtime: Tauri v2 shell for low-overhead desktop binaries.
+- Data engine: DuckDB embedded execution for analytical SQL over CSV files.
+
+## 7. Delivery Readiness Direction
+
+- Repeatable manual release flow through GitHub Actions with generated changelog sections.
+- Platform-targeted Linux and Windows bundles packaged from synchronized version metadata.
+
+## 8. Open Source Commitment
+
+Tapir Query is built for transparency and extension. A clear architecture and testable modules make the project suitable for regulated and infrastructure-critical environments.

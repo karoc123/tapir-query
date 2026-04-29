@@ -1,7 +1,73 @@
-# Tauri + Angular
+# Tapir Query App
 
-This template should help get you started developing with Tauri and Angular.
+This directory contains the Angular frontend and the Tauri v2 backend project.
 
-## Recommended IDE Setup
+## Features
 
-[VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer) + [Angular Language Service](https://marketplace.visualstudio.com/items?itemName=Angular.ng-template).
+- CodeMirror SQL editor with `Ctrl/Cmd+Enter` run shortcut.
+- Schema explorer sidebar with query history recall (last 20 successful queries).
+- Chunked query execution and virtualized table rendering.
+- Typed IPC bridge for `open_file`, `execute_query`, `export_csv`, and `export_rows`.
+- Log Console drawer for IPC errors, drag-drop validation, and signal state transitions.
+- DevTools performance overlay for bootup, file load, query, and grid render timings.
+
+## Development
+
+```bash
+pnpm install
+pnpm tauri:dev
+```
+
+If running from a Snap-packaged editor terminal on Linux, prefer `pnpm tauri:dev` over `pnpm tauri dev` to avoid GLIBC symbol conflicts.
+
+## Integration Fixtures
+
+```bash
+pnpm fixtures:pull
+```
+
+This downloads real sample CSV files into `tests/fixtures/downloads/`.
+
+## Desktop Cleanup Script
+
+```bash
+./scripts/cleanup-desktop.sh
+```
+
+This removes mobile-oriented icon/gen folders and any legacy fixture submodule directory.
+
+## Build
+
+```bash
+pnpm tauri build
+```
+
+## Tests
+
+Frontend:
+
+```bash
+pnpm test
+```
+
+Backend + fixture integration:
+
+```bash
+pnpm test:backend
+```
+
+Backend:
+
+```bash
+cd src-tauri
+cargo test
+```
+
+## Notes
+
+- The frontend uses Standalone Angular components and Signals.
+- Frontend dependencies are migrated to Angular 21.
+- IPC access is isolated in `src/app/infrastructure/tauri-bridge.service.ts`.
+- UI orchestration lives in `src/app/domain/file.service.ts` and `src/app/domain/query.service.ts`.
+- Backend command handlers are in `src-tauri/src/commands`, orchestration in `src-tauri/src/domain`, and DuckDB engine code in `src-tauri/src/engine`.
+- Unit tests run on Jest (`jest.config.js`, `setup-jest.ts`) instead of Karma/Jasmine.
