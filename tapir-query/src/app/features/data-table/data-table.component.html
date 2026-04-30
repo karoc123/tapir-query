@@ -3,7 +3,7 @@
     <div class="table-empty">Open a CSV file and execute a query to render rows.</div>
   } @else {
     <div class="table-header" [style.gridTemplateColumns]="gridTemplateColumns()">
-      @for (column of columns(); track column) {
+      @for (column of columns(); track column; let columnIndex = $index) {
         <div class="table-head-cell" role="columnheader" [attr.aria-label]="column" [class.filter-open]="isFilterOpen(column)">
           <span class="table-head-title" [title]="column">{{ column }}</span>
 
@@ -49,7 +49,7 @@
           </div>
 
           @if (isFilterOpen(column)) {
-            <div class="filter-popover" [attr.aria-label]="'Filter options for ' + column" role="group">
+            <div class="filter-popover" [class.align-start]="columnIndex === 0" [attr.aria-label]="'Filter options for ' + column" role="group">
               <label class="filter-field">
                 <span class="filter-label">Operator</span>
                 <select class="filter-select" [value]="activeFilterOperator()" (change)="onFilterOperatorChanged($event)">

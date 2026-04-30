@@ -21,6 +21,15 @@ const countChunk = (count: string): QueryChunk => ({
   elapsedMs: 1,
 });
 
+const countChunkWithAlias = (count: string, alias: string): QueryChunk => ({
+  columns: [alias],
+  rows: [{ [alias]: count }],
+  limit: 1,
+  offset: 0,
+  nextOffset: null,
+  elapsedMs: 1,
+});
+
 describe("DatasetMetricsService", () => {
   const bridgeMock = new MockTauriService();
 
@@ -98,5 +107,19 @@ describe("DatasetMetricsService", () => {
     expect(service.filteredCount()).toBe(Number.MAX_SAFE_INTEGER);
     expect(service.totalCount()).toBe(Number.MAX_SAFE_INTEGER);
     expect(service.rowStatusLabel()).toContain("+");
+  });
+
+  it("handles overflow when COUNT(*) arrives under alternate aliases", async () => {
+    bridgeMock.executeQueryResults = [countChunkWithAlias("90071992547409932", "COUNT(*)"), countChunk("5")];
+
+    const service = TestBed.inject(DatasetMetricsService);
+    service.refresh("SELECT * FROM transactions", "transactions");
+
+    jest.runOnlyPendingTimers();
+    await flushPromises();
+
+    expect(service.filteredCount()).toBe(Number.MAX_SAFE_INTEGER);
+    expect(service.totalCount()).toBe(5);
+    expect(service.rowStatusLabel()).toContain(`${Number.MAX_SAFE_INTEGER.toLocaleString()}+ of 5 Rows`);
   });
 });

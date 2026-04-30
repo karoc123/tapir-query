@@ -1,20 +1,28 @@
 import { TestBed } from "@angular/core/testing";
 import { AppComponent } from "./app.component";
+import { IngestionService } from "./domain/ingestion.service";
 import { TauriBridgeService } from "./infrastructure/tauri-bridge.service";
 import { MockTauriService } from "./testing/mock-tauri.service";
 
 describe("AppComponent", () => {
   const bridgeMock = new MockTauriService();
+  const ingestionMock = {
+    attachNativeDropListener: jest.fn(async () => null),
+  };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [AppComponent],
-      providers: [{ provide: TauriBridgeService, useValue: bridgeMock }],
+      providers: [
+        { provide: TauriBridgeService, useValue: bridgeMock },
+        { provide: IngestionService, useValue: ingestionMock },
+      ],
     }).compileComponents();
   });
 
   afterEach(() => {
     bridgeMock.reset();
+    ingestionMock.attachNativeDropListener.mockClear();
   });
 
   it("loads file and executes default query", async () => {

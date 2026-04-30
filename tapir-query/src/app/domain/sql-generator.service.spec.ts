@@ -63,6 +63,24 @@ describe("SqlGeneratorService", () => {
     expect(nextSql).toContain("ORDER BY t.id DESC");
   });
 
+  it("appends filter predicate to top-level WHERE in complex JOIN queries", () => {
+    const service = TestBed.inject(SqlGeneratorService);
+
+    const nextSql = service.withFilterIntent(
+      "SELECT t.id, c.name, ev.last_event_at FROM transactions t LEFT JOIN customers c ON c.id = t.customer_id LEFT JOIN (SELECT customer_id, MAX(event_at) AS last_event_at FROM customer_events WHERE event_type = 'PURCHASE' GROUP BY customer_id) ev ON ev.customer_id = t.customer_id WHERE t.amount > 100 AND c.status = 'active' ORDER BY t.created_at DESC LIMIT 50 OFFSET 10",
+      {
+        columnName: "c.segment",
+        value: "Enterprise",
+        operator: "equals",
+      },
+      "transactions",
+    );
+
+    expect(nextSql).toContain("FROM customer_events WHERE event_type = 'PURCHASE' GROUP BY customer_id");
+    expect(nextSql).toContain("WHERE t.amount > 100 AND c.status = 'active' AND (\"c\".\"segment\" = 'Enterprise')");
+    expect(nextSql).toContain("ORDER BY t.created_at DESC LIMIT 50 OFFSET 10");
+  });
+
   it("inserts WHERE before GROUP BY when no WHERE exists", () => {
     const service = TestBed.inject(SqlGeneratorService);
 
@@ -111,6 +129,15 @@ describe("SqlGeneratorService", () => {
 
     expect(runMalformedTransform).not.toThrow();
     expect(runMalformedTransform()).toContain("WHERE");
+  });
+
+  it("rebuilds malformed trailing ORDER BY clauses without throwing", () => {
+    const service = TestBed.inject(SqlGeneratorService);
+
+    const runMalformedOrderBy = (): string => service.withOrderBy("SELECT * FROM transactions ORDER BY", "amount", "desc", "transactions");
+
+    expect(runMalformedOrderBy).not.toThrow();
+    expect(runMalformedOrderBy()).toBe('SELECT * FROM transactions ORDER BY "amount" DESC');
   });
 
   it("falls back to a table query when input SQL is empty", () => {

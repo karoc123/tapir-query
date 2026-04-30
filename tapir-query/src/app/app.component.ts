@@ -2,6 +2,7 @@ import { CommonModule } from "@angular/common";
 import { afterNextRender, Component, computed, effect, inject, OnDestroy } from "@angular/core";
 import { DatasetMetricsService } from "./domain/dataset-metrics.service";
 import { FileService } from "./domain/file.service";
+import { IngestionService } from "./domain/ingestion.service";
 import { QueryService } from "./domain/query.service";
 import type { FilterIntent } from "./domain/sql-generator.service";
 import { CheatSheetComponent } from "./features/cheat-sheet/cheat-sheet.component";
@@ -39,6 +40,7 @@ export class AppComponent implements OnDestroy {
   private readonly fileService = inject(FileService);
   private readonly queryService = inject(QueryService);
   private readonly datasetMetricsService = inject(DatasetMetricsService);
+  private readonly ingestionService = inject(IngestionService);
   private readonly layoutState = inject(LayoutStateService);
   private readonly logsService = inject(LogService);
   private readonly perfService = inject(PerfService);
@@ -137,7 +139,7 @@ export class AppComponent implements OnDestroy {
     afterNextRender(() => {
       this.perfService.markBootReady();
       this.logsService.info("boot", "Application is ready");
-      void this.attachNativeDropLogger();
+      void this.attachNativeDropIngestion();
     });
   }
 
@@ -288,34 +290,11 @@ export class AppComponent implements OnDestroy {
     return `${(timestamp / 1000).toFixed(1)}s`;
   }
 
-  private async attachNativeDropLogger(): Promise<void> {
-    if (!this.isTauriRuntime()) {
-      this.logsService.warn("drag-drop.raw", "Tauri runtime not detected; native drag-drop listener was not attached.");
-      return;
-    }
-
-    try {
-      const { getCurrentWebviewWindow } = await import("@tauri-apps/api/webviewWindow");
-      const webview = getCurrentWebviewWindow();
-
-      const unlisten = await webview.onDragDropEvent((event) => {
-        this.logsService.info("drag-drop.raw", "Native drag-drop event", event);
-      });
-
+  private async attachNativeDropIngestion(): Promise<void> {
+    const unlisten = await this.ingestionService.attachNativeDropListener();
+    if (unlisten !== null) {
       this.unlistenNativeDropEvents.push(unlisten);
-      this.logsService.info("drag-drop.raw", "Attached native drag-drop listener");
-    } catch (error) {
-      this.logsService.error("drag-drop.raw", "Failed to attach native drag-drop listener", { error: this.extractError(error) });
     }
-  }
-
-  private isTauriRuntime(): boolean {
-    if (typeof window === "undefined") {
-      return false;
-    }
-
-    const runtimeMarker = "__TAURI_INTERNALS__";
-    return runtimeMarker in (window as unknown as Record<string, unknown>);
   }
 
   private extractError(error: unknown): string {

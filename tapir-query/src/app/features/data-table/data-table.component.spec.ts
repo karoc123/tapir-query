@@ -109,4 +109,20 @@ describe("DataTableComponent", () => {
 
     expect(emitted).toEqual([]);
   });
+
+  it("anchors the first column filter popover to the start edge", () => {
+    const fixture = TestBed.createComponent(DataTableComponent);
+    const component = fixture.componentInstance;
+
+    fixture.componentRef.setInput("columns", ["amount", "currency"]);
+    fixture.detectChanges();
+
+    component.toggleFilterEditor("amount");
+    fixture.detectChanges();
+
+    const popover = fixture.nativeElement.querySelector(".filter-popover") as HTMLElement | null;
+
+    expect(popover).not.toBeNull();
+    expect(popover?.classList.contains("align-start")).toBe(true);
+  });
 });

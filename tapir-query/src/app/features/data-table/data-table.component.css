@@ -121,6 +121,11 @@
   z-index: 6;
 }
 
+.filter-popover.align-start {
+  left: 0.35rem;
+  right: auto;
+}
+
 .filter-field {
   display: grid;
   gap: 0.24rem;
