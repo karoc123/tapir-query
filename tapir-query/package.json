@@ -23,6 +23,7 @@
     "@angular/forms": "^21.2.10",
     "@angular/platform-browser": "^21.2.10",
     "@angular/router": "^21.2.10",
+    "@codemirror/autocomplete": "^6.20.1",
     "@codemirror/commands": "^6.8.1",
     "@codemirror/lang-sql": "^6.8.0",
     "@codemirror/state": "^6.5.2",

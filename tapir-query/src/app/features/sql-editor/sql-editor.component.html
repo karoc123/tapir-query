@@ -1,11 +1,2 @@
 <label class="sr-only" for="tapir-sql-input">SQL query</label>
-<textarea
-  #sqlInput
-  id="tapir-sql-input"
-  class="sql-input"
-  [disabled]="loading()"
-  [value]="query()"
-  [placeholder]="placeholder()"
-  (input)="onInput($event)"
-  (keydown)="onKeydown($event)"
-></textarea>
+<div #editorHost id="tapir-sql-input" class="sql-input" role="textbox" aria-multiline="true" [attr.aria-disabled]="loading()"></div>

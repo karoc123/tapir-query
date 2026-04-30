@@ -40,6 +40,11 @@ export class CheatSheetComponent {
       note: "Monthly buckets are useful for trend sanity checks.",
     },
     {
+      title: "Columns With Spaces",
+      sql: 'SELECT "Last Name", "First Name" FROM my_table WHERE "Last Name" IS NOT NULL;',
+      note: 'Wrap identifiers with spaces in double quotes, for example "Last Name".',
+    },
+    {
       title: "Basic Join",
       sql: "SELECT o.order_id, c.customer_name FROM orders o LEFT JOIN customers c ON o.customer_id = c.customer_id;",
       note: "Alias tables for readability in cross-file analyses.",

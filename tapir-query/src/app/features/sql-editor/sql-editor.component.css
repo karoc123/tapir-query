@@ -2,25 +2,52 @@
   width: 100%;
   min-height: 3.5rem;
   max-height: 11.5rem;
-  resize: none;
-  overflow: auto;
   border: 1px solid var(--tapir-border);
   border-radius: 0.75rem;
   background: var(--tapir-surface-alt);
   color: var(--tapir-text-primary);
-  font-family: "JetBrains Mono", "Courier New", monospace;
-  font-size: 0.79rem;
-  line-height: 1.45;
-  padding: 0.55rem 0.6rem;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  overflow: hidden;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
-.sql-input:focus {
+.sql-input:focus-within {
   outline: none;
   border-color: var(--tapir-accent-strong);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--tapir-accent) 20%, transparent);
 }
 
-.sql-input:disabled {
+.sql-input[aria-disabled="true"] {
   opacity: 0.75;
+}
+
+:host ::ng-deep .sql-input .cm-editor {
+  background: transparent;
+}
+
+:host ::ng-deep .sql-input .cm-focused {
+  outline: none;
+}
+
+:host ::ng-deep .sql-input .cm-scroller {
+  min-height: 3.5rem;
+  max-height: 11.5rem;
+  overflow: auto;
+}
+
+:host ::ng-deep .sql-input .cm-content,
+:host ::ng-deep .sql-input .cm-tooltip,
+:host ::ng-deep .sql-input .cm-completionLabel {
+  font-family: "JetBrains Mono", "Courier New", monospace;
+  font-size: 0.79rem;
+  line-height: 1.45;
+}
+
+:host ::ng-deep .sql-input .cm-content {
+  padding: 0.55rem 0.6rem;
+}
+
+:host ::ng-deep .sql-input .cm-tooltip-autocomplete ul {
+  max-height: 12rem;
 }
