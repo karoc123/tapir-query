@@ -151,11 +151,13 @@ src/app/
   - Isolated plugin state machine for background profiling.
   - Profiles only columns that the user drags from the Columns sidebar into the analysis drop zone.
   - No profiling run starts until at least one column is dropped.
+  - Reuses already computed metrics for retained columns when charts are added/removed.
   - Incrementally resolves per-column metric cards (completeness, cardinality, string length).
   - Uses request-token cancellation so stale runs cannot overwrite active UI state.
 
 - `ThemeService`
-  - Theme selection and settings panel state with storage persistence.
+  - Theme selection (`Light`, `Dark`, `Dark 2026`, `Night Owl`) and settings panel state.
+  - Persists active theme in local storage with legacy value migration.
 
 ### 4.3 UI Composition
 
@@ -169,6 +171,7 @@ src/app/
   - Zone C: data area.
     - Default: data table with overlays and virtualization.
     - Analysis mode: split-view with top analysis dashboard drop zone and bottom data table.
+      - Vertical split ratio is user-resizable via drag handle and persisted locally.
       - Initial state: instructional empty drop area (no charts rendered).
       - After drop: charts render for each dropped column (one card per column).
   - Zone D: status bar (query status, row status, elapsed time).
@@ -274,6 +277,7 @@ This is functional but not strict least privilege.
 - Dynamic imports are used for some Tauri-only browser APIs.
 - Analysis profiling is queued with bounded frontend concurrency and async IPC jobs.
 - Analysis profiling is demand-driven and starts only after a column is dropped into the analysis area.
+- Existing column metrics are reused; only newly dropped columns enqueue new profiling tasks.
 - Profiling timings are tracked separately (`analysisBatch`, `analysisProfile`, `analysisRoundTrip`).
 
 ### 9.2 Known Trade-offs

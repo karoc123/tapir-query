@@ -234,4 +234,83 @@ describe("DataAnalysisPluginService", () => {
     expect(service.totalTasks()).toBe(0);
     expect(bridgeMock.runColumnProfileMetricCalls.length).toBe(0);
   });
+
+  it("computes metrics only for newly dropped columns", async () => {
+    const service = TestBed.inject(DataAnalysisPluginService);
+
+    bridgeMock.runColumnProfileMetricImpl = async (payload) => {
+      if (payload.metric === "completenessAudit") {
+        return completenessResult(payload.columnName, 0.9);
+      }
+      if (payload.metric === "cardinalityTopValues") {
+        return cardinalityResult(payload.columnName);
+      }
+      return lengthResult(payload.columnName);
+    };
+
+    service.enable();
+    service.refresh({
+      tableName: "transactions",
+      sql: "SELECT * FROM transactions",
+      columns: [{ name: "partner", dataType: "VARCHAR" }],
+    });
+
+    await flushPromises();
+
+    expect(bridgeMock.runColumnProfileMetricCalls.length).toBe(3);
+
+    service.refresh({
+      tableName: "transactions",
+      sql: "SELECT * FROM transactions",
+      columns: [
+        { name: "partner", dataType: "VARCHAR" },
+        { name: "iban", dataType: "VARCHAR" },
+      ],
+    });
+
+    await flushPromises();
+
+    expect(bridgeMock.runColumnProfileMetricCalls.length).toBe(6);
+    expect(bridgeMock.runColumnProfileMetricCalls.slice(3).every((call) => call.columnName === "iban")).toBe(true);
+  });
+
+  it("does not recompute remaining columns when a chart is removed", async () => {
+    const service = TestBed.inject(DataAnalysisPluginService);
+
+    bridgeMock.runColumnProfileMetricImpl = async (payload) => {
+      if (payload.metric === "completenessAudit") {
+        return completenessResult(payload.columnName, 0.9);
+      }
+      if (payload.metric === "cardinalityTopValues") {
+        return cardinalityResult(payload.columnName);
+      }
+      return lengthResult(payload.columnName);
+    };
+
+    service.enable();
+    service.refresh({
+      tableName: "transactions",
+      sql: "SELECT * FROM transactions",
+      columns: [
+        { name: "partner", dataType: "VARCHAR" },
+        { name: "iban", dataType: "VARCHAR" },
+      ],
+    });
+
+    await flushPromises();
+    expect(bridgeMock.runColumnProfileMetricCalls.length).toBe(6);
+
+    service.refresh({
+      tableName: "transactions",
+      sql: "SELECT * FROM transactions",
+      columns: [{ name: "partner", dataType: "VARCHAR" }],
+    });
+
+    await flushPromises();
+
+    expect(bridgeMock.runColumnProfileMetricCalls.length).toBe(6);
+    expect(service.columnProfiles().length).toBe(1);
+    expect(service.columnProfiles()[0]?.columnName).toBe("partner");
+    expect(service.columnProfiles()[0]?.completeness.status).toBe("ready");
+  });
 });

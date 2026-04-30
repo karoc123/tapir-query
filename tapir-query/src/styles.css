@@ -43,31 +43,36 @@
   --tapir-fab-bg: var(--tapir-accent-strong);
   --tapir-fab-hover-bg: #354759;
   --tapir-fab-text: #f5f5f5;
+  --tapir-status-bg: var(--tapir-surface);
+  --tapir-status-fg: var(--tapir-text-muted);
+  --tapir-overlay-backdrop: rgba(44, 62, 80, 0.24);
+  --tapir-cheat-card-bg: var(--tapir-surface-alt);
+  --tapir-code-bg: #f7fbff;
+  --tapir-code-border: rgba(44, 62, 80, 0.22);
+  --tapir-code-text: #2c3e50;
   --tapir-error-surface: var(--tapir-error-bg);
 }
 
-:root[data-theme="dark-banking"] {
+:root[data-theme="dark"] {
   color-scheme: dark;
-  --tapir-bg-base: #2c3e50;
-  --tapir-bg-panel: #31465c;
-  --tapir-bg-panel-muted: #3a5168;
-  --tapir-text-primary: #e8eef2;
-  --tapir-text-muted: #b3c2ce;
-  --tapir-accent: #9eacb8;
-  --tapir-accent-strong: #c3ced7;
-  --tapir-border: rgba(232, 238, 242, 0.24);
-  --tapir-border-soft: rgba(232, 238, 242, 0.12);
-  --tapir-border-strong: rgba(232, 238, 242, 0.5);
-  --tapir-panel-shadow: rgba(8, 16, 23, 0.38);
-  --tapir-panel-shadow-strong: rgba(8, 16, 23, 0.55);
-  --tapir-shell-bg:
-    radial-gradient(circle at 18% 16%, rgba(191, 203, 213, 0.16), transparent 36%), radial-gradient(circle at 85% 12%, rgba(137, 158, 176, 0.2), transparent 34%),
-    linear-gradient(180deg, #2c3e50 0%, #304457 52%, #2a3a4b 100%);
-  --tapir-drop-surface: rgba(58, 81, 104, 0.88);
-  --tapir-drop-active: rgba(83, 108, 131, 0.86);
-  --tapir-error-bg: rgba(122, 76, 63, 0.42);
-  --tapir-error-border: rgba(227, 183, 168, 0.45);
-  --tapir-error-text: #ffd8cb;
+  --tapir-bg-base: #1e1e1e;
+  --tapir-bg-panel: #252526;
+  --tapir-bg-panel-muted: #3c3c3c;
+  --tapir-text-primary: #cccccc;
+  --tapir-text-muted: #a6a6a6;
+  --tapir-accent: #007fd4;
+  --tapir-accent-strong: #007acc;
+  --tapir-border: #80808059;
+  --tapir-border-soft: #cccccc33;
+  --tapir-border-strong: #007fd4;
+  --tapir-panel-shadow: rgba(0, 0, 0, 0.36);
+  --tapir-panel-shadow-strong: rgba(0, 0, 0, 0.5);
+  --tapir-shell-bg: #1e1e1e;
+  --tapir-drop-surface: #2a2d2e;
+  --tapir-drop-active: #04395e;
+  --tapir-error-bg: #5a1d1d;
+  --tapir-error-border: #be1100;
+  --tapir-error-text: #f88070;
 
   --tapir-body-bg: var(--tapir-bg-base);
   --tapir-surface: var(--tapir-bg-panel);
@@ -78,13 +83,114 @@
   --tapir-panel-bg: var(--tapir-bg-panel);
   --tapir-panel-border: var(--tapir-border);
   --tapir-drop-border: var(--tapir-border-strong);
-  --tapir-chip-bg: var(--tapir-accent-strong);
-  --tapir-chip-text: #1e2b38;
-  --tapir-progress-track: rgba(232, 238, 242, 0.2);
-  --tapir-progress-bar: linear-gradient(90deg, #9eacb8 0%, #d4dee6 100%);
-  --tapir-fab-bg: #4a6076;
-  --tapir-fab-hover-bg: #5a7085;
-  --tapir-fab-text: #eff4f7;
+  --tapir-chip-bg: #0e639c;
+  --tapir-chip-text: #ffffff;
+  --tapir-progress-track: #37373d;
+  --tapir-progress-bar: linear-gradient(90deg, #0e639c 0%, #007acc 100%);
+  --tapir-fab-bg: #0e639c;
+  --tapir-fab-hover-bg: #1177bb;
+  --tapir-fab-text: #ffffff;
+  --tapir-status-bg: #007acc;
+  --tapir-status-fg: #ffffff;
+  --tapir-overlay-backdrop: rgba(0, 0, 0, 0.44);
+  --tapir-cheat-card-bg: var(--tapir-surface-alt);
+  --tapir-code-bg: #1f2933;
+  --tapir-code-border: #cccccc33;
+  --tapir-code-text: #d4d4d4;
+  --tapir-error-surface: var(--tapir-error-bg);
+}
+
+:root[data-theme="dark-2026"] {
+  color-scheme: dark;
+  --tapir-bg-base: #121314;
+  --tapir-bg-panel: #191a1b;
+  --tapir-bg-panel-muted: #202122;
+  --tapir-text-primary: #bfbfbf;
+  --tapir-text-muted: #8c8c8c;
+  --tapir-accent: #297aa0;
+  --tapir-accent-strong: #3994bc;
+  --tapir-border: #2a2b2cff;
+  --tapir-border-soft: #333536b3;
+  --tapir-border-strong: #3994bcb3;
+  --tapir-panel-shadow: rgba(0, 0, 0, 0.4);
+  --tapir-panel-shadow-strong: rgba(0, 0, 0, 0.56);
+  --tapir-shell-bg: #121314;
+  --tapir-drop-surface: #191a1b;
+  --tapir-drop-active: #242526;
+  --tapir-error-bg: #4f1e17;
+  --tapir-error-border: #f48771;
+  --tapir-error-text: #f5b4a8;
+
+  --tapir-body-bg: var(--tapir-bg-base);
+  --tapir-surface: var(--tapir-bg-panel);
+  --tapir-surface-alt: var(--tapir-bg-panel-muted);
+  --tapir-text: var(--tapir-text-primary);
+  --tapir-heading: var(--tapir-text-primary);
+  --tapir-muted: var(--tapir-text-muted);
+  --tapir-panel-bg: var(--tapir-bg-panel);
+  --tapir-panel-border: var(--tapir-border);
+  --tapir-drop-border: var(--tapir-border-strong);
+  --tapir-chip-bg: #3994bcf0;
+  --tapir-chip-text: #ffffff;
+  --tapir-progress-track: #202122;
+  --tapir-progress-bar: linear-gradient(90deg, #297aa0 0%, #3994bc 100%);
+  --tapir-fab-bg: #297aa0;
+  --tapir-fab-hover-bg: #2f89b2;
+  --tapir-fab-text: #ffffff;
+  --tapir-status-bg: #191a1b;
+  --tapir-status-fg: #bfbfbf;
+  --tapir-overlay-backdrop: rgba(0, 0, 0, 0.52);
+  --tapir-cheat-card-bg: #202122;
+  --tapir-code-bg: #202122;
+  --tapir-code-border: #2a2b2cff;
+  --tapir-code-text: #d4d4d4;
+  --tapir-error-surface: var(--tapir-error-bg);
+}
+
+:root[data-theme="night-owl"] {
+  color-scheme: dark;
+  --tapir-bg-base: #070a0f;
+  --tapir-bg-panel: #0b1017;
+  --tapir-bg-panel-muted: #111823;
+  --tapir-text-primary: #d6deeb;
+  --tapir-text-muted: #8aa0b4;
+  --tapir-accent: #a277d4;
+  --tapir-accent-strong: #c792ea;
+  --tapir-border: #3d4f62b3;
+  --tapir-border-soft: #3d4f6266;
+  --tapir-border-strong: #5a6f88;
+  --tapir-panel-shadow: rgba(0, 0, 0, 0.62);
+  --tapir-panel-shadow-strong: rgba(0, 0, 0, 0.8);
+  --tapir-shell-bg: #070a0f;
+  --tapir-drop-surface: #0b1017;
+  --tapir-drop-active: #1a2230;
+  --tapir-error-bg: #ab0300f2;
+  --tapir-error-border: #ef5350;
+  --tapir-error-text: #ffffffcc;
+
+  --tapir-body-bg: var(--tapir-bg-base);
+  --tapir-surface: var(--tapir-bg-panel);
+  --tapir-surface-alt: var(--tapir-bg-panel-muted);
+  --tapir-text: var(--tapir-text-primary);
+  --tapir-heading: var(--tapir-text-primary);
+  --tapir-muted: var(--tapir-text-muted);
+  --tapir-panel-bg: var(--tapir-bg-panel);
+  --tapir-panel-border: var(--tapir-border);
+  --tapir-drop-border: var(--tapir-border-strong);
+  --tapir-chip-bg: #7e57c2cc;
+  --tapir-chip-text: #ffffffcc;
+  --tapir-progress-track: #090f18;
+  --tapir-progress-bar: linear-gradient(90deg, #7e57c2 0%, #c792ea 100%);
+  --tapir-fab-bg: #7e57c2cc;
+  --tapir-fab-hover-bg: #8b63d0;
+  --tapir-fab-text: #ffffffcc;
+  --tapir-status-bg: #070a0f;
+  --tapir-status-fg: #d6deeb;
+  --tapir-overlay-backdrop: rgba(3, 5, 8, 0.78);
+  --tapir-cheat-card-bg: #111823;
+  --tapir-code-bg: #090f18;
+  --tapir-code-border: #3d4f62;
+  --tapir-code-text: #d6deeb;
   --tapir-error-surface: var(--tapir-error-bg);
 }
 

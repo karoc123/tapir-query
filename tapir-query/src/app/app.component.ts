@@ -124,7 +124,22 @@ export class AppComponent implements OnDestroy {
 
   readonly analysisToggleLabel = computed(() => (this.analysisPanelOpen() ? "Hide Data Analysis" : "Show Data Analysis"));
 
+  readonly analysisSplitMin = 28;
+  readonly analysisSplitMax = 72;
+  private readonly analysisSplitStorageKey = "tapir.analysis.split.v1";
+  private readonly defaultAnalysisSplitPercent = 46;
+
   private readonly analysisSelectedColumnNames = signal<string[]>([]);
+  private readonly analysisSplitPercentState = signal(this.loadAnalysisSplitPercent());
+  private splitterDragState: {
+    pointerId: number;
+    startY: number;
+    startPercent: number;
+    containerHeight: number;
+  } | null = null;
+
+  readonly analysisSplitPercent = computed(() => this.analysisSplitPercentState());
+  readonly analysisSplitCssValue = computed(() => `${this.analysisSplitPercentState().toFixed(2)}%`);
 
   readonly loadingActivityEntries = computed(() =>
     this.logEntries()
@@ -346,6 +361,95 @@ export class AppComponent implements OnDestroy {
     this.layoutState.toggleAnalysisPanel();
   }
 
+  onAnalysisSplitterPointerDown(event: PointerEvent): void {
+    if (!this.analysisPanelOpen()) {
+      return;
+    }
+
+    const handle = event.currentTarget as HTMLElement | null;
+    if (!handle) {
+      return;
+    }
+
+    const dataZone = handle.closest(".data-zone") as HTMLElement | null;
+    const containerHeight = dataZone?.getBoundingClientRect().height ?? 0;
+    if (!Number.isFinite(containerHeight) || containerHeight <= 0) {
+      return;
+    }
+
+    this.splitterDragState = {
+      pointerId: event.pointerId,
+      startY: event.clientY,
+      startPercent: this.analysisSplitPercentState(),
+      containerHeight,
+    };
+
+    handle.setPointerCapture(event.pointerId);
+    handle.classList.add("is-dragging");
+    event.preventDefault();
+  }
+
+  onAnalysisSplitterPointerMove(event: PointerEvent): void {
+    const dragState = this.splitterDragState;
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const deltaPercent = ((event.clientY - dragState.startY) / dragState.containerHeight) * 100;
+    this.setAnalysisSplitPercent(dragState.startPercent + deltaPercent);
+    event.preventDefault();
+  }
+
+  onAnalysisSplitterPointerUp(event: PointerEvent): void {
+    const dragState = this.splitterDragState;
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const handle = event.currentTarget as HTMLElement | null;
+    if (handle?.hasPointerCapture(event.pointerId)) {
+      handle.releasePointerCapture(event.pointerId);
+    }
+    handle?.classList.remove("is-dragging");
+    this.persistAnalysisSplitPercent(this.analysisSplitPercentState());
+    this.splitterDragState = null;
+  }
+
+  onAnalysisSplitterKeyDown(event: KeyboardEvent): void {
+    if (!this.analysisPanelOpen()) {
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      this.setAnalysisSplitPercent(this.analysisSplitPercentState() - 4, true);
+      event.preventDefault();
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      this.setAnalysisSplitPercent(this.analysisSplitPercentState() + 4, true);
+      event.preventDefault();
+      return;
+    }
+
+    if (event.key === "Home") {
+      this.setAnalysisSplitPercent(this.analysisSplitMin, true);
+      event.preventDefault();
+      return;
+    }
+
+    if (event.key === "End") {
+      this.setAnalysisSplitPercent(this.analysisSplitMax, true);
+      event.preventDefault();
+      return;
+    }
+
+    if (event.key === "Enter" || event.key === " ") {
+      this.setAnalysisSplitPercent(this.defaultAnalysisSplitPercent, true);
+      event.preventDefault();
+    }
+  }
+
   closeCheatSheet(): void {
     this.layoutState.closeCheatSheet();
   }
@@ -402,5 +506,49 @@ export class AppComponent implements OnDestroy {
     }
 
     return resolved;
+  }
+
+  private setAnalysisSplitPercent(nextPercent: number, persist = false): void {
+    const clampedPercent = Math.max(this.analysisSplitMin, Math.min(this.analysisSplitMax, nextPercent));
+    const roundedPercent = Number(clampedPercent.toFixed(2));
+    this.analysisSplitPercentState.set(roundedPercent);
+
+    if (persist) {
+      this.persistAnalysisSplitPercent(roundedPercent);
+    }
+  }
+
+  private loadAnalysisSplitPercent(): number {
+    if (typeof localStorage === "undefined") {
+      return this.defaultAnalysisSplitPercent;
+    }
+
+    try {
+      const rawValue = localStorage.getItem(this.analysisSplitStorageKey);
+      if (rawValue === null) {
+        return this.defaultAnalysisSplitPercent;
+      }
+
+      const parsedValue = Number.parseFloat(rawValue);
+      if (!Number.isFinite(parsedValue)) {
+        return this.defaultAnalysisSplitPercent;
+      }
+
+      return Math.max(this.analysisSplitMin, Math.min(this.analysisSplitMax, parsedValue));
+    } catch {
+      return this.defaultAnalysisSplitPercent;
+    }
+  }
+
+  private persistAnalysisSplitPercent(splitPercent: number): void {
+    if (typeof localStorage === "undefined") {
+      return;
+    }
+
+    try {
+      localStorage.setItem(this.analysisSplitStorageKey, splitPercent.toFixed(2));
+    } catch {
+      // Ignore storage limitations.
+    }
   }
 }

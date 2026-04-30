@@ -2,7 +2,7 @@
   position: fixed;
   inset: 0;
   z-index: 85;
-  background: rgba(44, 62, 80, 0.24);
+  background: var(--tapir-overlay-backdrop);
 }
 
 .cheat-sheet-drawer {
@@ -70,7 +70,7 @@
   border: 1px solid var(--tapir-border-soft);
   border-radius: 0.75rem;
   padding: 0.65rem;
-  background: var(--tapir-surface-alt);
+  background: var(--tapir-cheat-card-bg);
 }
 
 .sheet-item h4 {
@@ -83,8 +83,10 @@
   margin: 0.45rem 0 0;
   padding: 0.5rem;
   border-radius: 0.45rem;
-  background: color-mix(in srgb, var(--tapir-accent) 10%, white);
-  border: 1px solid var(--tapir-border-soft);
+  background: var(--tapir-code-bg);
+  border: 1px solid var(--tapir-code-border);
+  color: var(--tapir-code-text);
+  font-family: "IBM Plex Mono", monospace;
   font-size: 0.72rem;
   overflow: auto;
 }

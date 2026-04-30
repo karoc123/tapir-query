@@ -61,6 +61,11 @@ export class DataAnalysisPluginService {
   private readonly metricOrder: ColumnProfileMetricKind[] = ["completenessAudit", "cardinalityTopValues", "stringLengthHistogram"];
 
   private requestToken = 0;
+  private activeSql: string | null = null;
+  private readonly queuedTasks: AnalysisTask[] = [];
+  private readonly queuedTaskKeys = new Set<string>();
+  private activeWorkers = 0;
+  private analysisBatchActive = false;
 
   private readonly state = signal<DataAnalysisState>({
     enabled: false,
@@ -142,7 +147,7 @@ export class DataAnalysisPluginService {
       return;
     }
 
-    const signature = this.buildSignature(context.tableName, normalizedSql, context.columns);
+    const signature = this.buildSignature(context.tableName, normalizedSql);
     if (context.columns.length === 0) {
       if (snapshot.activeSignature === signature && snapshot.columns.length === 0 && !snapshot.running) {
         return;
@@ -153,108 +158,77 @@ export class DataAnalysisPluginService {
       });
 
       this.stopActiveRun();
-      this.state.update((current) => ({
-        ...current,
+      this.state.set({
         enabled: true,
         running: false,
         activeSignature: signature,
         columns: [],
         totalTasks: 0,
         completedTasks: 0,
-      }));
-      return;
-    }
-
-    if (snapshot.activeSignature === signature && snapshot.columns.length > 0) {
-      this.logs.debug("analysis-plugin", "Skipping refresh for unchanged analysis signature", {
-        signature,
-        running: snapshot.running,
-        completedTasks: snapshot.completedTasks,
-        totalTasks: snapshot.totalTasks,
       });
       return;
     }
 
-    const tasks = this.buildTasks(context.columns);
-    const nextToken = this.createRequestToken();
-    const maxConcurrentTasks = this.resolveMaxConcurrentTasks();
+    const contextChanged = snapshot.activeSignature !== signature;
+    if (contextChanged) {
+      this.stopActiveRun();
+      this.activeSql = normalizedSql;
 
-    this.logs.info("analysis-plugin", "Scheduling analysis queue", {
-      tableName: context.tableName,
-      columnCount: context.columns.length,
-      taskCount: tasks.length,
-      maxConcurrentTasks,
-      tauriRuntime: this.tauriRuntime,
-    });
+      const loadingColumns = this.createLoadingColumns(context.columns);
+      const progress = this.calculateProgress(loadingColumns);
+      const visibleColumnNames = new Set(loadingColumns.map((column) => column.columnName));
 
-    this.perf.start("analysisBatch");
-    this.state.set({
-      enabled: true,
-      running: tasks.length > 0,
-      activeSignature: signature,
-      columns: this.createLoadingColumns(context.columns),
-      totalTasks: tasks.length,
-      completedTasks: 0,
-    });
-
-    if (tasks.length === 0) {
-      this.perf.end("analysisBatch");
-      return;
-    }
-
-    void this.executeTaskQueue(nextToken, normalizedSql, tasks, maxConcurrentTasks);
-  }
-
-  private async executeTaskQueue(requestToken: number, sql: string, tasks: AnalysisTask[], maxConcurrentTasks: number): Promise<void> {
-    const workerCount = Math.min(maxConcurrentTasks, tasks.length);
-    this.logs.debug("analysis-plugin", "Analysis queue started", {
-      workerCount,
-      queuedTasks: tasks.length,
-      requestToken,
-    });
-    const workers = Array.from({ length: workerCount }, () => this.runWorker(requestToken, sql, tasks));
-
-    await Promise.all(workers);
-
-    if (!this.isActiveRequest(requestToken)) {
-      this.logs.debug("analysis-plugin", "Analysis queue finished for stale token", {
-        requestToken,
+      this.state.set({
+        enabled: true,
+        running: loadingColumns.length > 0,
+        activeSignature: signature,
+        columns: loadingColumns,
+        totalTasks: progress.totalTasks,
+        completedTasks: progress.completedTasks,
       });
+
+      const tasks = this.buildTasks(context.columns);
+      this.enqueueTasks(tasks, visibleColumnNames);
+      this.logs.info("analysis-plugin", "Scheduling analysis queue", {
+        tableName: context.tableName,
+        columnCount: context.columns.length,
+        taskCount: tasks.length,
+        maxConcurrentTasks: this.resolveMaxConcurrentTasks(),
+        tauriRuntime: this.tauriRuntime,
+      });
+
+      this.startWorkers(this.requestToken);
       return;
     }
 
-    this.perf.end("analysisBatch");
-    this.logs.info("analysis-plugin", "Analysis queue completed", {
-      requestToken,
-      completedTasks: this.state().completedTasks,
-      totalTasks: this.state().totalTasks,
-    });
+    this.activeSql = normalizedSql;
+
+    const mergeResult = this.mergeColumnsForSelection(snapshot.columns, context.columns);
+    const visibleColumnNames = new Set(mergeResult.columns.map((column) => column.columnName));
+    this.pruneQueuedTasks(visibleColumnNames);
+
+    const tasks = this.buildTasks(mergeResult.newColumns);
+    this.enqueueTasks(tasks, visibleColumnNames);
+
+    const progress = this.calculateProgress(mergeResult.columns);
     this.state.update((current) => ({
       ...current,
-      running: false,
+      enabled: true,
+      running: this.hasLoadingMetrics(mergeResult.columns) && this.isVisibleWorkPending(visibleColumnNames),
+      activeSignature: signature,
+      columns: mergeResult.columns,
+      totalTasks: progress.totalTasks,
+      completedTasks: progress.completedTasks,
     }));
-  }
 
-  private async runWorker(requestToken: number, sql: string, tasks: AnalysisTask[]): Promise<void> {
-    this.logs.debug("analysis-plugin", "Worker started", {
-      requestToken,
-    });
-
-    while (this.isActiveRequest(requestToken)) {
-      const task = tasks.shift();
-      if (!task) {
-        this.logs.debug("analysis-plugin", "Worker completed", {
-          requestToken,
-        });
-        return;
-      }
-
-      await this.runTask(requestToken, sql, task);
+    if (tasks.length > 0) {
+      this.logs.info("analysis-plugin", "Scheduling analysis tasks for newly dropped columns", {
+        addedColumns: mergeResult.newColumns.map((column) => column.name),
+        taskCount: tasks.length,
+      });
     }
 
-    this.logs.debug("analysis-plugin", "Worker stopped due to stale token", {
-      requestToken,
-    });
+    this.startWorkers(this.requestToken);
   }
 
   private async runTask(requestToken: number, sql: string, task: AnalysisTask): Promise<void> {
@@ -312,11 +286,53 @@ export class DataAnalysisPluginService {
       this.markMetricError(task, this.extractError(error), performance.now() - startedAt);
     } finally {
       if (this.isActiveRequest(requestToken)) {
-        this.state.update((current) => ({
-          ...current,
-          completedTasks: Math.min(current.completedTasks + 1, current.totalTasks),
-        }));
+        this.updateProgressAndRunning();
       }
+    }
+  }
+
+  private startWorkers(requestToken: number): void {
+    const maxConcurrentTasks = this.resolveMaxConcurrentTasks();
+
+    while (this.isActiveRequest(requestToken) && this.activeWorkers < maxConcurrentTasks && this.queuedTasks.length > 0) {
+      this.activeWorkers += 1;
+      void this.runWorkerFromQueue(requestToken);
+    }
+
+    this.finishBatchIfIdle();
+    this.updateProgressAndRunning();
+  }
+
+  private async runWorkerFromQueue(requestToken: number): Promise<void> {
+    this.logs.debug("analysis-plugin", "Worker started", {
+      requestToken,
+    });
+
+    try {
+      while (this.isActiveRequest(requestToken)) {
+        const task = this.queuedTasks.shift();
+        if (!task) {
+          this.logs.debug("analysis-plugin", "Worker completed", {
+            requestToken,
+          });
+          return;
+        }
+
+        this.queuedTaskKeys.delete(this.taskKey(task));
+        const sql = this.activeSql;
+        if (!sql) {
+          continue;
+        }
+
+        await this.runTask(requestToken, sql, task);
+      }
+
+      this.logs.debug("analysis-plugin", "Worker stopped due to stale token", {
+        requestToken,
+      });
+    } finally {
+      this.activeWorkers = Math.max(0, this.activeWorkers - 1);
+      this.startWorkers(this.requestToken);
     }
   }
 
@@ -424,14 +440,18 @@ export class DataAnalysisPluginService {
   }
 
   private createLoadingColumns(columns: ColumnSchema[]): ColumnAnalysisProfile[] {
-    return columns.map((column) => ({
+    return columns.map((column) => this.createLoadingColumn(column));
+  }
+
+  private createLoadingColumn(column: ColumnSchema): ColumnAnalysisProfile {
+    return {
       columnName: column.name,
       dataType: column.dataType,
       totalRows: null,
       cardinality: this.createLoadingSlot<CardinalityMetricView>(),
       completeness: this.createLoadingSlot<CompletenessAudit>(),
       stringLength: this.createLoadingSlot<StringLengthHistogram>(),
-    }));
+    };
   }
 
   private buildTasks(columns: ColumnSchema[]): AnalysisTask[] {
@@ -481,7 +501,13 @@ export class DataAnalysisPluginService {
       requestToken: this.requestToken,
     });
     this.createRequestToken();
-    this.perf.end("analysisBatch");
+    this.activeSql = null;
+    this.queuedTasks.length = 0;
+    this.queuedTaskKeys.clear();
+    if (this.analysisBatchActive) {
+      this.perf.end("analysisBatch");
+      this.analysisBatchActive = false;
+    }
   }
 
   private resolveMaxConcurrentTasks(): number {
@@ -512,9 +538,140 @@ export class DataAnalysisPluginService {
     return column?.totalRows ?? null;
   }
 
-  private buildSignature(tableName: string, sql: string, columns: ColumnSchema[]): string {
-    const schemaFingerprint = columns.map((column) => `${column.name}:${column.dataType}`).join("|");
-    return `${tableName}::${sql}::${schemaFingerprint}`;
+  private buildSignature(tableName: string, sql: string): string {
+    return `${tableName}::${sql}`;
+  }
+
+  private mergeColumnsForSelection(existing: ColumnAnalysisProfile[], selected: ColumnSchema[]): { columns: ColumnAnalysisProfile[]; newColumns: ColumnSchema[] } {
+    const existingByName = new Map(existing.map((column) => [column.columnName, column]));
+    const newColumns: ColumnSchema[] = [];
+
+    const columns = selected.map((selectedColumn) => {
+      const existingColumn = existingByName.get(selectedColumn.name);
+      if (!existingColumn) {
+        newColumns.push(selectedColumn);
+        return this.createLoadingColumn(selectedColumn);
+      }
+
+      if (existingColumn.dataType !== selectedColumn.dataType) {
+        return {
+          ...existingColumn,
+          dataType: selectedColumn.dataType,
+        };
+      }
+
+      return existingColumn;
+    });
+
+    return {
+      columns,
+      newColumns,
+    };
+  }
+
+  private calculateProgress(columns: ColumnAnalysisProfile[]): { totalTasks: number; completedTasks: number } {
+    let completedTasks = 0;
+
+    for (const column of columns) {
+      if (column.completeness.status === "ready" || column.completeness.status === "error") {
+        completedTasks += 1;
+      }
+      if (column.cardinality.status === "ready" || column.cardinality.status === "error") {
+        completedTasks += 1;
+      }
+      if (column.stringLength.status === "ready" || column.stringLength.status === "error") {
+        completedTasks += 1;
+      }
+    }
+
+    return {
+      totalTasks: columns.length * this.metricOrder.length,
+      completedTasks,
+    };
+  }
+
+  private hasLoadingMetrics(columns: ColumnAnalysisProfile[]): boolean {
+    return columns.some((column) => column.completeness.status === "loading" || column.cardinality.status === "loading" || column.stringLength.status === "loading");
+  }
+
+  private isVisibleWorkPending(visibleColumnNames: Set<string>): boolean {
+    if (this.activeWorkers > 0) {
+      return true;
+    }
+
+    return this.queuedTasks.some((task) => visibleColumnNames.has(task.columnName));
+  }
+
+  private enqueueTasks(tasks: AnalysisTask[], visibleColumnNames: Set<string>): number {
+    let enqueuedTasks = 0;
+
+    for (const task of tasks) {
+      if (!visibleColumnNames.has(task.columnName)) {
+        continue;
+      }
+
+      const key = this.taskKey(task);
+      if (this.queuedTaskKeys.has(key)) {
+        continue;
+      }
+
+      this.queuedTaskKeys.add(key);
+      this.queuedTasks.push(task);
+      enqueuedTasks += 1;
+    }
+
+    if (enqueuedTasks > 0 && !this.analysisBatchActive) {
+      this.perf.start("analysisBatch");
+      this.analysisBatchActive = true;
+    }
+
+    return enqueuedTasks;
+  }
+
+  private pruneQueuedTasks(visibleColumnNames: Set<string>): void {
+    if (this.queuedTasks.length === 0) {
+      return;
+    }
+
+    const remainingTasks = this.queuedTasks.filter((task) => visibleColumnNames.has(task.columnName));
+    if (remainingTasks.length === this.queuedTasks.length) {
+      return;
+    }
+
+    this.queuedTasks.length = 0;
+    this.queuedTasks.push(...remainingTasks);
+
+    this.queuedTaskKeys.clear();
+    for (const task of remainingTasks) {
+      this.queuedTaskKeys.add(this.taskKey(task));
+    }
+
+    this.finishBatchIfIdle();
+  }
+
+  private finishBatchIfIdle(): void {
+    if (this.activeWorkers === 0 && this.queuedTasks.length === 0 && this.analysisBatchActive) {
+      this.perf.end("analysisBatch");
+      this.analysisBatchActive = false;
+    }
+  }
+
+  private updateProgressAndRunning(): void {
+    this.state.update((current) => {
+      const progress = this.calculateProgress(current.columns);
+      const visibleColumnNames = new Set(current.columns.map((column) => column.columnName));
+
+      return {
+        ...current,
+        running: this.hasLoadingMetrics(current.columns) && this.isVisibleWorkPending(visibleColumnNames),
+        totalTasks: progress.totalTasks,
+        completedTasks: progress.completedTasks,
+      };
+    });
+  }
+
+  private taskKey(task: AnalysisTask): string {
+    return `${task.columnName}::${task.metric}`;
   }
 
   private createRequestToken(): number {

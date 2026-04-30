@@ -11,7 +11,7 @@ import { AppTheme, ThemeOption } from "../../infrastructure/theme.service";
 })
 export class SettingsPanelComponent {
   readonly open = input(false);
-  readonly activeTheme = input<AppTheme>("soft-tapir");
+  readonly activeTheme = input<AppTheme>("light");
   readonly options = input<ThemeOption[]>([]);
 
   readonly closeRequested = output<void>();

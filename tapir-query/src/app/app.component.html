@@ -38,15 +38,33 @@
   @if (isLoadedLayout()) {
     <section class="loaded-layout" [class.with-sidebar]="analysisPanelOpen()">
       <header class="zone-a action-bar">
-        <div class="file-stack">
-          <button type="button" class="file-pill file-picker-trigger" [disabled]="loading()" title="Open another CSV file" (click)="onFileNameClicked()">
-            <span class="file-name">{{ currentFileName() ?? "Unknown file" }}</span>
-            <span class="file-meta">{{ currentFileSizeLabel() }}</span>
-          </button>
+        <div class="action-meta-row">
+          <div class="file-stack">
+            <button type="button" class="file-pill file-picker-trigger" [disabled]="loading()" title="Open another CSV file" (click)="onFileNameClicked()">
+              <span class="file-name">{{ currentFileName() ?? "Unknown file" }}</span>
+              <span class="file-meta">{{ currentFileSizeLabel() }}</span>
+            </button>
+          </div>
 
           <div class="metadata-tools">
             <button type="button" class="icon-button" aria-label="Open settings" title="Settings" (click)="toggleSettings()">&#9881;</button>
             <button type="button" class="icon-button" aria-label="Open cheat sheet" title="DuckDB cheat sheet" (click)="toggleCheatSheet()">?</button>
+          </div>
+
+          <div class="command-center">
+            <button type="button" class="action-button execute-button" [disabled]="loading()" (click)="runQuery()">Execute</button>
+            <button
+              type="button"
+              class="action-button analysis-button"
+              [class.active]="analysisPanelOpen()"
+              [disabled]="loading() || !effectiveSql()"
+              [attr.aria-label]="analysisToggleLabel()"
+              [title]="analysisToggleLabel()"
+              (click)="toggleAnalysisPanel()"
+            >
+              Analyze
+            </button>
+            <button type="button" class="action-button export-button" [disabled]="loading()" (click)="exportResults()">Export</button>
           </div>
         </div>
 
@@ -61,22 +79,6 @@
             (runRequested)="runQuery()"
           />
         </div>
-
-        <div class="command-center">
-          <button type="button" class="action-button execute-button" [disabled]="loading()" (click)="runQuery()">Execute</button>
-          <button type="button" class="action-button export-button" [disabled]="loading()" (click)="exportResults()">Export</button>
-          <button
-            type="button"
-            class="action-button analysis-button"
-            [class.active]="analysisPanelOpen()"
-            [disabled]="loading() || !effectiveSql()"
-            [attr.aria-label]="analysisToggleLabel()"
-            [title]="analysisToggleLabel()"
-            (click)="toggleAnalysisPanel()"
-          >
-            Analyze
-          </button>
-        </div>
       </header>
 
       @if (analysisPanelOpen()) {
@@ -85,7 +87,7 @@
         </aside>
       }
 
-      <section class="zone-c data-zone" [class.with-analysis]="analysisPanelOpen()">
+      <section class="zone-c data-zone" [class.with-analysis]="analysisPanelOpen()" [style.--analysis-split]="analysisSplitCssValue()">
         @if (analysisPanelOpen()) {
           <section class="analysis-zone">
             <app-data-analysis-dashboard
@@ -97,6 +99,22 @@
               (columnRemoved)="onAnalysisColumnRemoved($event)"
             />
           </section>
+
+          <div
+            class="analysis-splitter"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Resize analysis and table panels"
+            tabindex="0"
+            [attr.aria-valuemin]="analysisSplitMin"
+            [attr.aria-valuemax]="analysisSplitMax"
+            [attr.aria-valuenow]="analysisSplitPercent()"
+            (pointerdown)="onAnalysisSplitterPointerDown($event)"
+            (pointermove)="onAnalysisSplitterPointerMove($event)"
+            (pointerup)="onAnalysisSplitterPointerUp($event)"
+            (pointercancel)="onAnalysisSplitterPointerUp($event)"
+            (keydown)="onAnalysisSplitterKeyDown($event)"
+          ></div>
         }
 
         <section class="table-zone">
