@@ -12,8 +12,9 @@ This file is the operating guide for coding agents working in this repository.
 - `ErrorParsingService` converts raw Tauri/Rust errors to display-safe DTOs.
 - `OpenFileResponse` includes `fileSizeBytes` across Rust and TypeScript contracts.
 - Tauri command handlers are async and dispatch heavy work through `spawn_blocking`.
-- Query flow defaults to session streaming (`start_query_session` + `read_query_session_chunk`) with a direct fast-path for simple `COUNT(*)` queries.
+- Query flow currently runs in direct mode (`execute_query`) for open, run, and sort paths; session streaming commands remain implemented but are not the primary runtime path.
 - Linux Snap GLIBC workaround is required for local dev (`pnpm tauri:dev` handles env sanitization).
+- `tauri.conf.json` `productName` must not contain filesystem-reserved characters (for example `:`), or `tauri dev` fails validation at startup.
 - Release pipeline currently ships Windows NSIS `.exe` and Linux `.deb` artifacts only.
 
 ## Default Plan (How To Approach Any Task)
@@ -63,6 +64,7 @@ From `tapir-query/`:
 - Keep snake_case DTOs with serde camelCase mapping.
 - Keep command handlers thin; orchestration belongs in domain services.
 - Preserve typed error mapping and predictable response contracts.
+- Avoid broad capability defaults (`core:default`, `opener:default`) unless strictly required; prefer least-privilege permissions.
 
 ### Contracts
 
@@ -93,6 +95,7 @@ Run the narrowest test set that proves the change, then run broader checks:
   - `GIO_MODULE_DIR`
   - `GTK_PATH_VSCODE_SNAP_ORIG`
   - `GIO_MODULE_DIR_VSCODE_SNAP_ORIG`
+- Tauri v2 rejects invalid `productName` characters during config validation; keep `productName` filesystem-safe and use window `title` for decorative punctuation.
 
 ## Style Instructions
 

@@ -1,23 +1,21 @@
-# Architecture: Tapir:Query
+# Architecture: Tapir Query
 
-## 1. Scope and Goals
+## 1. Product Scope
 
-Tapir:Query is a desktop-only, local-first analytics tool for CSV exploration.
+Tapir Query is a desktop-first, local analytics workbench for CSV exploration.
 
-Primary goals:
+Core objectives:
+- Fast SQL iteration on local files without server dependencies.
+- Predictable memory usage through bounded result windows.
+- Strict Rust/TypeScript IPC contracts.
+- Runtime resilience on constrained Linux desktop environments.
 
-- Fast local query iteration on large CSV files.
-- Predictable memory behavior via pagination and virtualization.
-- Strict boundaries between UI, orchestration, and execution layers.
-- Explicit IPC contracts between Rust and TypeScript.
-
-## 2. High-Level Runtime View
+## 2. Runtime Topology
 
 ```mermaid
 flowchart LR
-  UI[Angular 21 UI<br/>Standalone + Signals] --> Domain[Domain Services<br/>FileService / QueryService]
-  Domain --> Metrics[DatasetMetricsService<br/>Background Count Pattern]
-  Domain --> Bridge[Tauri Bridge Service<br/>invoke wrapper]
+  UI[Angular 21 UI<br/>Standalone Components + Signals] --> Domain[Domain Services<br/>FileService / QueryService / DatasetMetricsService]
+  Domain --> Bridge[TauriBridgeService<br/>Typed invoke wrapper]
   Bridge --> Cmd[Tauri Commands<br/>open_file / execute_query / start_query_session / read_query_session_chunk / close_query_session / export_csv / export_rows]
   Cmd --> Svc[CsvQueryService]
   Svc --> Engine[DuckDbEngine]
@@ -25,9 +23,9 @@ flowchart LR
   DuckDB --> CSV[(Local CSV Files)]
 ```
 
-## 3. Backend Architecture (Rust + DuckDB)
+## 3. Backend Architecture (Rust + Tauri + DuckDB)
 
-Module layout:
+### 3.1 Module Layout
 
 ```text
 src-tauri/src/
@@ -43,84 +41,46 @@ src-tauri/src/
   lib.rs
 ```
 
-Responsibilities:
+### 3.2 Responsibility Split
 
-- `commands`: Tauri command boundary and DTO entry points.
-- `domain`: orchestration and registry ownership.
-- `engine`: query execution abstraction and DuckDB implementation.
-- `error`: typed `AppError` categories (`Validation`, `Io`, `Sql`, `State`).
+- `lib.rs`
+  - Initializes tracing once.
+  - Builds Tauri app and registers command handlers.
+  - Provides shared `AppState` with `Arc<CsvQueryService>`.
 
-Command execution model:
+- `commands/csv_commands.rs`
+  - Tauri command boundary and DTO mapping.
+  - Uses `tauri::State<AppState>` for service access.
+  - Offloads blocking work to `spawn_blocking`.
 
-- Tauri command functions are async.
-- Blocking work (DuckDB operations, CSV export writes, filesystem-heavy actions) is executed on the blocking runtime via `spawn_blocking`.
-- Command handlers keep orchestration thin and delegate behavior to `CsvQueryService`/engine.
+- `domain/csv_query_service.rs`
+  - Orchestration between command layer and engine.
+  - Owns table registry with `Mutex<HashMap<String, RegisteredCsv>>`.
+  - Clears sessions when replacing active file.
 
-### 3.1 DuckDB Connection Strategy
+- `engine/duckdb_engine.rs`
+  - Concrete `CsvQueryEngine` implementation.
+  - Executes SQL, schema inspection, paging, export, and session storage.
 
-`DuckDbEngine` opens an in-memory DuckDB `Connection` per operation.
+- `error.rs`
+  - Typed app error taxonomy: `Validation`, `Io`, `Sql`, `State`.
 
-- On each operation, active registered CSV views are re-registered into that connection context.
-- This avoids cross-request connection reuse issues seen during incident debugging.
+### 3.3 State and Resource Strategy
 
-Session streaming state stores SQL + metadata rather than connection-bound temp table names.
+- Global app state is a single `AppState` managed by Tauri.
+- CSV registry is in service state (`Mutex<HashMap<...>>`).
+- Query sessions are stored in engine state (`Mutex<HashMap<session_id, QuerySessionState>>`).
+- DuckDB connection model: one in-memory `Connection` per operation.
+  - Active registered views are recreated into each operation context.
+  - Avoids cross-request connection reuse hazards.
 
-### 3.2 Registration and Session Optimizations
+### 3.4 Error Handling Pattern
 
-- Registered CSV views are recreated per operation from the active registry map.
-- Query sessions store normalized SQL, projected columns, and total rows.
-- `read_query_session_chunk` pages directly from stored SQL (`LIMIT/OFFSET`) and preserves column ordering.
-- `read_csv_auto` uses bounded inference sampling (`SAMPLE_SIZE=20000`) to reduce first-open overhead.
+- Internal layers return `AppResult<T>` / `EngineResult<T>`.
+- Command layer maps errors to user-facing strings.
+- Join failures from `spawn_blocking` are mapped to `State` errors with context.
 
-## 4. Frontend Architecture (Angular 21 + Signals)
-
-Module layout:
-
-```text
-src/app/
-  domain/
-    dataset-metrics.service.ts
-    file.service.ts
-    query.service.ts
-  infrastructure/
-    layout-state.service.ts
-    error-parsing.service.ts
-    tauri-bridge.service.ts
-    tauri-contracts.ts
-    log.service.ts
-    perf.service.ts
-    theme.service.ts
-  features/
-    drag-drop/
-    file-picker/
-    sql-editor/
-    data-table/
-    schema-sidebar/
-    cheat-sheet/
-    query-error-panel/
-    settings-panel/
-  app.component.*
-```
-
-State model:
-
-- `FileService` (Signals): current file path, table name, inferred schema.
-- `QueryService` (Signals): SQL text, rows, columns, pagination cursor, parsed errors, query timing, history.
-- `LayoutStateService` (Signals): empty/loaded mode, schema sidebar collapse state, cheat-sheet drawer state.
-- `ThemeService` (Signals): active theme + settings panel state with localStorage persistence.
-
-UI behavior:
-
-- Empty mode supports CSV ingestion via `DragDropDirective` and native file picker (`@tauri-apps/plugin-dialog`).
-- Loaded mode uses a four-zone layout: action bar, collapsible schema rail, data grid, status bar.
-- Data table filter actions insert SQL filter templates through `SqlGeneratorService`.
-- `DatasetMetricsService` resolves filtered and total row counts through low-priority `COUNT(*)` queries in browser test/runtime contexts; in Tauri runtime this path is disabled as an incident mitigation for WSL WebKit watchdog crashes.
-- SQL errors are parsed into DTOs and rendered inline directly under the editor.
-- Table rendering uses Angular CDK virtual scroll.
-
-## 5. IPC Protocol and Contracts
-
-Command surface:
+### 3.5 Command Surface
 
 - `open_file`
 - `execute_query`
@@ -130,81 +90,194 @@ Command surface:
 - `export_csv`
 - `export_rows`
 
-### 5.1 Command-Level DTO Mapping (Rust ↔ TypeScript)
+All command handlers are async wrappers around blocking work.
 
-| Command         | Rust Request DTO                                   | TS Request Contract                        | Rust Response DTO                                                                     | TS Response Contract                                                             |
-| :-------------- | :------------------------------------------------- | :----------------------------------------- | :------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------- |
-| `open_file`     | `OpenFileRequest { file_path }`                    | invoke payload `{ request: { filePath } }` | `OpenFileResponse { table_name, file_path, columns, default_query, file_size_bytes }` | `OpenFileResponse { tableName, filePath, columns, defaultQuery, fileSizeBytes }` |
-| `execute_query` | `ExecuteQueryRequest { sql, limit, offset }`       | `ExecuteQueryRequest`                      | `QueryChunk`                                                                          | `QueryChunk`                                                                     |
-| `export_csv`    | `ExportCsvRequest { sql, output_path }`            | `ExportCsvRequest`                         | `ExportCsvResponse`                                                                   | `ExportCsvResponse`                                                              |
-| `export_rows`   | `ExportRowsRequest { output_path, columns, rows }` | `ExportRowsRequest`                        | `ExportCsvResponse`                                                                   | `ExportCsvResponse`                                                              |
+## 4. Frontend Architecture (Angular 21 + Signals)
 
-### 5.2 Field Naming Rules
+### 4.1 Module Layout
 
-- Rust DTOs use snake_case fields.
-- Rust DTOs apply `#[serde(rename_all = "camelCase")]`.
-- TypeScript contracts are camelCase, matching serialized IPC payloads.
+```text
+src/app/
+  domain/
+    file.service.ts
+    query.service.ts
+    dataset-metrics.service.ts
+    ingestion.service.ts
+    sql-generator.service.ts
+  infrastructure/
+    tauri-bridge.service.ts
+    tauri-contracts.ts
+    error-parsing.service.ts
+    layout-state.service.ts
+    log.service.ts
+    perf.service.ts
+    theme.service.ts
+  features/
+    drag-drop/
+    file-picker/
+    sql-editor/
+    data-table/
+    schema-sidebar/
+    query-error-panel/
+    settings-panel/
+    cheat-sheet/
+  app.component.*
+```
 
-Example mapping:
+### 4.2 Service Ownership
 
-- Rust `file_path` ↔ TypeScript `filePath`
-- Rust `rows_written` ↔ TypeScript `rowsWritten`
+- `FileService`
+  - Current file path, table name, schema, and file size metadata.
 
-### 5.3 Query Payload Characteristics
+- `QueryService`
+  - Query text, result rows/columns, status messaging, query errors, history, sort state.
+  - Owns request token invalidation, load hints, viewport prefetch flow, and export triggers.
 
-- Query result rows are serialized as string-or-null cell values.
+- `DatasetMetricsService`
+  - Optional background filtered and total count queries.
+  - Disabled in Tauri runtime as runtime incident mitigation.
+
+- `LayoutStateService`
+  - Empty vs loaded layout mode.
+  - Sidebar and cheat-sheet panel state.
+
+- `ThemeService`
+  - Theme selection and settings panel state with storage persistence.
+
+### 4.3 UI Composition
+
+- Empty mode
+  - Drag-and-drop zone.
+  - Native file picker CTA.
+
+- Loaded mode (four-zone layout)
+  - Zone A: action bar (file pill, SQL editor, execute/export).
+  - Zone B: collapsible schema sidebar.
+  - Zone C: data table with overlays and virtualization.
+  - Zone D: status bar (query status, row status, elapsed time).
+
+## 5. Query Execution Modes
+
+### 5.1 Active Mode: Direct Query Execution
+
+Current primary runtime path:
+- `QueryService` open/run/sort flows call `execute_query` directly.
+- First page is fetched with bounded `limit` and `offset`.
+- `effectiveSql` stores the exact SQL used for the shown result.
+
+Why this mode is active:
+- Reliability mitigation during runtime hang investigations.
+
+### 5.2 Implemented but Non-Primary: Session Streaming
+
+Implemented backend + frontend methods remain:
+- `start_query_session`
+- `read_query_session_chunk`
+- `close_query_session`
+
+Current status:
+- Session streaming orchestration exists in `QueryService` but is not the default call path for open/run/sort.
+- Streaming remains available as fallback-capable logic and for targeted diagnostics.
+
+## 6. IPC Contracts and Type Mapping
+
+### 6.1 Naming Rules
+
+- Rust DTO fields are snake_case.
+- Rust DTO serialization uses `#[serde(rename_all = "camelCase")]`.
+- TypeScript contracts are camelCase.
+
+### 6.2 Contract Characteristics
+
+- Query rows cross IPC as `Record<string, string | null>`.
+- Backend normalizes projection cells to `VARCHAR` or null.
 - Pagination fields: `limit`, `offset`, `nextOffset`.
-- Engine execution timing is returned as `elapsedMs`.
-- Frontend currently uses a direct execute path for preview, execute, and sort interactions to maximize runtime reliability; session streaming is retained as a fallback-capable implementation but is not the default while incident-level hangs are being mitigated.
-- Status-bar row totals are resolved asynchronously through separate background `COUNT(*)` requests after the main query render path.
+- Timing field: `elapsedMs`.
 
-## 6. Observability and Benchmarking
+### 6.3 Bridge Layer
 
-Frontend telemetry:
+- `TauriBridgeService` wraps all command invocations.
+- Adds per-command perf timers and structured logs.
+- Centralized error extraction for unknown invoke failures.
 
-- `PerfService` tracks bootup, file load, query roundtrip, query engine, and grid render timings.
-- Dashboard shows latest and average durations.
+## 7. Memory and Lifecycle Model
 
-Backend telemetry:
+### 7.1 Frontend
 
-- `tracing` + `tracing-subscriber` log command lifecycle and engine-level failures.
+- Native drag-drop listener is attached once and unlistened in `AppComponent.ngOnDestroy`.
+- CodeMirror editor instance and effects are destroyed in `SqlEditorComponent.ngOnDestroy`.
+- `LogService` keeps a bounded in-memory ring (max 500 entries).
+- Query slow-load timer and metrics refresh timer are explicitly cleared.
 
-Diagnostics:
+### 7.2 Backend
 
-- `LogService` captures IPC errors, drag/drop handling, and state transition breadcrumbs.
-- Runtime incident diagnostics correlated app exits with `WebKitWebProcess` watchdog crashes after backend query success on WSL.
+- CSV registry and session maps are mutex-protected.
+- Sessions are cleared when a new file is opened.
+- Session lifecycle supports explicit close and global clear.
+- No hard TTL/cap for session map yet.
 
-## 7. Streaming and Memory Strategy
+## 8. Security Architecture
 
-- CSVs are exposed to DuckDB as views (not eagerly loaded into frontend memory).
-- Query results are page-based to keep IPC payload size bounded.
-- Virtualized table rendering keeps DOM size stable for large result sets.
+### 8.1 Tauri Capabilities
 
-## 8. Desktop-Only Decision Record
+Current capability (`capabilities/default.json`) grants:
+- `core:default`
+- `dialog:default`
+- `opener:default`
 
-Decision:
+This is functional but not strict least privilege.
 
-- Tapir:Query remains desktop-only (Linux and Windows distribution targets).
+### 8.2 CSP
 
-Consequences:
+- `tauri.conf.json` currently has `app.security.csp = null`.
+- This disables CSP enforcement and should be hardened for production builds.
 
-- Mobile-specific generated assets and icon folders are removed.
-- Cleanup automation exists at `tapir-query/scripts/cleanup-desktop.sh`.
-- Architecture and release process are optimized for desktop bundle outputs only.
+### 8.3 Command Trust Boundary
 
-## 9. Testing
+- Frontend may pass file and output paths to backend commands.
+- Backend validates basic state and I/O errors, but does not enforce path policy constraints beyond filesystem permissions.
 
-Backend:
+## 9. Performance Characteristics
 
-- Unit tests cover SQL builder and engine edge cases.
-- Real-world fixture test validates execution against downloaded sample CSVs.
+### 9.1 Existing Optimizations
 
-Frontend:
+- Per-operation DuckDB connections avoid unstable cross-request reuse.
+- `read_csv_auto` uses bounded `SAMPLE_SIZE=20000`.
+- UI table rendering uses virtual scrolling.
+- Dynamic imports are used for some Tauri-only browser APIs.
 
-- Jest test suites for app shell flow, query service behavior, and data table behavior.
+### 9.2 Known Trade-offs
 
-## 10. Release and Operational Readiness
+- Opening a new DuckDB connection per operation favors stability over raw throughput.
+- Background count queries are disabled on Tauri runtime to reduce watchdog crash pressure.
 
-- Manual release workflow: `.github/workflows/release.yml` (`workflow_dispatch`).
-- Version synchronization is applied to `package.json`, `tauri.conf.json`, and `Cargo.toml`.
-- Windows NSIS `.exe` and Linux `.deb` artifacts are produced and uploaded to a draft GitHub release.
+## 10. Build and Runtime Operations
+
+### 10.1 Build Snapshot
+
+- Frontend production build succeeds with CSS budget warnings on:
+  - `app.component.css`
+  - `data-table.component.css`
+- Backend `cargo check` succeeds without warnings.
+
+### 10.2 Dev Runtime Constraint
+
+- `tauri dev` currently fails config validation if `productName` contains reserved filename characters (for example `:`).
+
+### 10.3 Platform Targets
+
+- Desktop-focused packaging and release workflow.
+- Current release artifacts: Windows NSIS `.exe` and Linux `.deb`.
+
+## 11. Architectural Risks and Next Actions
+
+Priority actions:
+1. Make `productName` config-valid to restore dev runtime boot.
+2. Tighten capabilities to least privilege (especially opener/core scope).
+3. Define production CSP.
+4. Decide streaming policy:
+   - remove dormant path, or
+   - feature-flag and keep actively tested.
+5. Add session TTL/cap and query cancellation strategy.
+
+This reflects the current implemented architecture as of April 30, 2026, including the active direct execution mode.
