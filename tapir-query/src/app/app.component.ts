@@ -488,7 +488,26 @@ export class AppComponent implements OnDestroy {
   }
 
   private async attachNativeDropIngestion(): Promise<void> {
-    const unlisten = await this.ingestionService.attachNativeDropListener();
+    const unlisten = await this.ingestionService.attachNativeDropListener({
+      onFilePath: async (filePath) => {
+        const normalizedPath = this.normalizeDroppedFilePath(filePath);
+
+        if (!/\.csv$/i.test(normalizedPath)) {
+          this.onDropError("Only CSV files are supported. Drop a .csv file.");
+          return;
+        }
+
+        if (this.loading()) {
+          this.logsService.warn("drag-drop.raw", "Ignoring native file drop while another file is loading", {
+            filePath: normalizedPath,
+          });
+          return;
+        }
+
+        await this.onFileDropped(normalizedPath);
+      },
+    });
+
     if (unlisten !== null) {
       this.unlistenNativeDropEvents.push(unlisten);
     }
@@ -502,6 +521,29 @@ export class AppComponent implements OnDestroy {
       return error.message;
     }
     return "Unknown runtime error";
+  }
+
+  private normalizeDroppedFilePath(filePath: string): string {
+    const trimmed = filePath.trim();
+
+    if (trimmed.startsWith("file://")) {
+      try {
+        const parsed = new URL(trimmed);
+        return this.stripWindowsDrivePrefix(decodeURIComponent(parsed.pathname));
+      } catch {
+        return this.stripWindowsDrivePrefix(decodeURIComponent(trimmed.replace(/^file:\/\//, "")));
+      }
+    }
+
+    return this.stripWindowsDrivePrefix(trimmed);
+  }
+
+  private stripWindowsDrivePrefix(path: string): string {
+    if (/^\/[A-Za-z]:[\\/]/.test(path)) {
+      return path.slice(1);
+    }
+
+    return path;
   }
 
   private resolveSelectedAnalysisColumns(columns: ColumnSchema[], selectedColumnNames: string[]): ColumnSchema[] {

@@ -54,8 +54,7 @@ export class DragDropDirective {
       return;
     }
 
-    const message =
-      "Unable to resolve file path from drop event. Drop the file directly from your file manager.";
+    const message = "Unable to resolve file path from drop event. Drop the file directly from your file manager.";
     this.logs.error("drag-drop", message);
     this.dropError.emit(message);
   }
@@ -74,12 +73,7 @@ export class DragDropDirective {
         .find((line) => line.startsWith("file://"));
 
       if (firstUri) {
-        try {
-          const parsed = new URL(firstUri);
-          return this.normalizeFilePath(decodeURIComponent(parsed.pathname));
-        } catch {
-          return this.normalizeFilePath(decodeURIComponent(firstUri.replace("file://", "")));
-        }
+        return this.normalizeFilePath(firstUri);
       }
     }
 
@@ -98,11 +92,24 @@ export class DragDropDirective {
 
   private normalizeFilePath(path: string): string {
     const trimmed = path.trim();
-    if (/^\/[A-Za-z]:\//.test(trimmed)) {
-      return trimmed.slice(1);
+    if (trimmed.startsWith("file://")) {
+      try {
+        const parsed = new URL(trimmed);
+        return this.stripWindowsDrivePrefix(decodeURIComponent(parsed.pathname));
+      } catch {
+        return this.stripWindowsDrivePrefix(decodeURIComponent(trimmed.replace(/^file:\/\//, "")));
+      }
     }
 
-    return trimmed;
+    return this.stripWindowsDrivePrefix(trimmed);
+  }
+
+  private stripWindowsDrivePrefix(path: string): string {
+    if (/^\/[A-Za-z]:[\\/]/.test(path)) {
+      return path.slice(1);
+    }
+
+    return path;
   }
 
   private looksLikeCsv(filePath: string): boolean {

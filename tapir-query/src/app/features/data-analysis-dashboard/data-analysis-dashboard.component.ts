@@ -89,12 +89,12 @@ export class DataAnalysisDashboardComponent {
       return;
     }
 
-    const columnName = transfer.getData("application/x-tapir-column-name").trim();
+    const columnName = this.readTransferData(transfer, ["application/x-tapir-column-name", "text/x-tapir-column-name", "text/plain"]);
     if (!columnName) {
       return;
     }
 
-    const dataType = transfer.getData("application/x-tapir-column-type").trim();
+    const dataType = this.readTransferData(transfer, ["application/x-tapir-column-type", "text/x-tapir-column-type"]);
     this.columnDropped.emit({
       columnName,
       dataType: dataType || null,
@@ -103,5 +103,16 @@ export class DataAnalysisDashboardComponent {
 
   removeColumn(columnName: string): void {
     this.columnRemoved.emit(columnName);
+  }
+
+  private readTransferData(transfer: DataTransfer, types: string[]): string {
+    for (const type of types) {
+      const value = transfer.getData(type).trim();
+      if (value) {
+        return value;
+      }
+    }
+
+    return "";
   }
 }

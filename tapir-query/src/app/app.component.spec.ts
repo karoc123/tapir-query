@@ -1,13 +1,17 @@
 import { TestBed } from "@angular/core/testing";
 import { AppComponent } from "./app.component";
-import { IngestionService } from "./domain/ingestion.service";
+import { IngestionHandlers, IngestionService } from "./domain/ingestion.service";
 import { TauriBridgeService } from "./infrastructure/tauri-bridge.service";
 import { MockTauriService } from "./testing/mock-tauri.service";
 
 describe("AppComponent", () => {
   const bridgeMock = new MockTauriService();
+  let capturedNativeHandlers: IngestionHandlers | undefined;
   const ingestionMock = {
-    attachNativeDropListener: jest.fn(async () => null),
+    attachNativeDropListener: jest.fn(async (handlers?: IngestionHandlers) => {
+      capturedNativeHandlers = handlers;
+      return null;
+    }),
   };
 
   beforeEach(async () => {
@@ -22,6 +26,7 @@ describe("AppComponent", () => {
 
   afterEach(() => {
     bridgeMock.reset();
+    capturedNativeHandlers = undefined;
     ingestionMock.attachNativeDropListener.mockClear();
   });
 
@@ -71,5 +76,33 @@ describe("AppComponent", () => {
       sql: "SELECT * FROM transactions LIMIT 1000",
       outputPath: "exports/query-results.csv",
     });
+  });
+
+  it("opens CSV files dropped through native Tauri drag-drop events", async () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    const component = fixture.componentInstance;
+    fixture.detectChanges();
+    await Promise.resolve();
+
+    expect(capturedNativeHandlers?.onFilePath).toBeDefined();
+    await capturedNativeHandlers?.onFilePath?.("/tmp/native-drop.csv");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    await Promise.resolve();
+
+    expect(bridgeMock.openFileCalls).toEqual(["/tmp/native-drop.csv"]);
+    expect(component.queryError()).toBeNull();
+  });
+
+  it("rejects non-CSV files dropped through native Tauri drag-drop events", async () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    const component = fixture.componentInstance;
+    fixture.detectChanges();
+    await Promise.resolve();
+
+    expect(capturedNativeHandlers?.onFilePath).toBeDefined();
+    await capturedNativeHandlers?.onFilePath?.("/tmp/native-drop.txt");
+
+    expect(bridgeMock.openFileCalls).toEqual([]);
+    expect(component.queryError()?.summary).toContain("Only CSV files are supported");
   });
 });
