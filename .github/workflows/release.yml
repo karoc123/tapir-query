@@ -87,6 +87,7 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
+    timeout-minutes: 30
     needs: prepare-changelog
     defaults:
       run:
@@ -113,6 +114,12 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Rust dependencies and build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            tapir-query/src-tauri -> target
+
       - name: Sync versions from workflow input
         shell: bash
         run: |
@@ -127,7 +134,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Windows bundles
-        run: pnpm tauri build --ci --bundles msi,nsis
+        run: pnpm tauri build --ci -v --bundles msi,nsis
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -140,6 +147,7 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     needs: prepare-changelog
     defaults:
       run:
@@ -179,6 +187,12 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Rust dependencies and build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            tapir-query/src-tauri -> target
+
       - name: Sync versions from workflow input
         shell: bash
         run: |
@@ -192,7 +206,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Linux bundles
-        run: pnpm tauri build --ci --bundles deb,appimage
+        run: pnpm tauri build --ci -v --bundles deb,appimage
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
