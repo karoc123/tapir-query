@@ -40,36 +40,6 @@ cd tapir-query && pnpm tauri:dev
 - Context-first UI that starts in a single empty-state ingestion surface.
 - Built-in observability for logs and runtime timing telemetry.
 
-## Performance and Responsiveness
-
-Recent phases focused on reducing first-load latency and keeping the UI responsive while large CSV operations run:
-
-- Tauri command handlers are async and run blocking DuckDB/IO work in `spawn_blocking` tasks.
-- File open now runs a bounded preview query (`LIMIT 1000`) instead of loading a full result window immediately.
-- Query sessions stream chunks on demand (`start_query_session` + `read_query_session_chunk`) with frontend windowed prefetch.
-- A direct execution fast-path is used for simple `SELECT COUNT(*)` aggregates.
-- DuckDB view registration is cached and stale views are dropped when file context changes.
-- CSV schema inference sampling is bounded (`SAMPLE_SIZE=20000`) to avoid expensive full-file inference.
-
-Re-run the fixture benchmark check locally:
-
-```bash
-cd tapir-query/src-tauri
-cargo test engine::duckdb_engine::tests::reads_real_world_sample_fixture -- --exact --nocapture
-```
-
-## Themes: Soft Tapir and Dark Banking
-
-Use the `Settings` button in the app shell to switch theme profiles.
-
-- `Soft Tapir`: balanced neutral light palette for daytime workflows.
-- `Dark Banking`: higher-contrast dark palette for low-light operations.
-
-Visual placeholder convention for screenshots in project docs:
-
-- `docs/assets/theme-soft-tapir.png`
-- `docs/assets/theme-dark-banking.png`
-
 ## Linux Troubleshooting (Snap/GLIBC Conflict)
 
 If you see this error while running dev mode:
@@ -126,12 +96,3 @@ cd tapir-query && pnpm test:backend
 # production build
 cd tapir-query && pnpm tauri build
 ```
-
-## Cleanup Script
-
-```bash
-cd tapir-query
-./scripts/cleanup-desktop.sh
-```
-
-This removes mobile artifact paths and legacy fixture submodule traces for the desktop-only target.

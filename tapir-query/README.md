@@ -21,22 +21,6 @@ pnpm tauri:dev
 
 If running from a Snap-packaged editor terminal on Linux, prefer `pnpm tauri:dev` over `pnpm tauri dev` to avoid GLIBC symbol conflicts.
 
-## Integration Fixtures
-
-```bash
-pnpm fixtures:pull
-```
-
-This downloads real sample CSV files into `tests/fixtures/downloads/`.
-
-## Desktop Cleanup Script
-
-```bash
-./scripts/cleanup-desktop.sh
-```
-
-This removes mobile-oriented icon/gen folders and any legacy fixture submodule directory.
-
 ## Build
 
 ```bash

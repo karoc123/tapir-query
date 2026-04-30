@@ -45,7 +45,7 @@ describe("QueryService", () => {
     await service.sortByEntireTableColumn("amount", "asc");
 
     expect(bridgeMock.startQuerySessionCalls[1]).toEqual({
-      sql: 'SELECT * FROM "transactions" ORDER BY "amount" ASC',
+      sql: 'SELECT * FROM transactions ORDER BY "amount" ASC LIMIT 1000',
     });
     expect(bridgeMock.readQuerySessionChunkCalls[1]).toEqual({
       sessionId: "session-1",
@@ -61,6 +61,7 @@ describe("QueryService", () => {
     expect(service.rows().length).toBe(1);
     expect(service.activeSortColumn()).toBe("amount");
     expect(service.activeSortDirection()).toBe("asc");
+    expect(service.query()).toBe('SELECT * FROM transactions ORDER BY "amount" ASC LIMIT 1000');
   });
 
   it("runs simple COUNT queries through direct execution path", async () => {
@@ -90,7 +91,7 @@ describe("QueryService", () => {
     expect(service.activeSortColumn()).toBeNull();
     expect(service.activeSortDirection()).toBeNull();
     expect(bridgeMock.startQuerySessionCalls[1]).toEqual({
-      sql: 'SELECT * FROM "transactions" ORDER BY "amount" DESC',
+      sql: 'SELECT * FROM transactions ORDER BY "amount" DESC LIMIT 1000',
     });
     expect(bridgeMock.startQuerySessionCalls[2]).toEqual({
       sql: "SELECT currency, COUNT(*) FROM transactions GROUP BY currency",
@@ -100,5 +101,15 @@ describe("QueryService", () => {
       limit: 1000,
       offset: 0,
     });
+  });
+
+  it("inserts a filter template into the editor SQL without running a query", async () => {
+    const service = TestBed.inject(QueryService);
+
+    await service.openFile("/tmp/transactions.csv");
+    service.applyFilterTemplate("currency");
+
+    expect(service.query()).toBe('SELECT * FROM transactions WHERE "currency" = \'value\' LIMIT 1000');
+    expect(bridgeMock.startQuerySessionCalls.length).toBe(1);
   });
 });

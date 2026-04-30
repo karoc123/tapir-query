@@ -29,6 +29,7 @@ export class DataTableComponent {
   readonly sortColumn = input<string | null>(null);
   readonly sortDirection = input<SortDirection | null>(null);
   readonly sortRequested = output<TableSortRequest>();
+  readonly filterRequested = output<string>();
   readonly viewportIndexChange = output<number>();
 
   readonly gridTemplateColumns = computed(() => {
@@ -66,18 +67,22 @@ export class DataTableComponent {
     const nextDirection: SortDirection =
       this.sortColumn() === column && this.sortDirection() === "asc" ? "desc" : "asc";
 
+    this.requestSort(column, nextDirection);
+  }
+
+  requestSort(column: string, direction: SortDirection): void {
     this.sortRequested.emit({
       column,
-      direction: nextDirection,
+      direction,
     });
   }
 
-  sortIndicator(column: string): string {
-    if (this.sortColumn() !== column) {
-      return "";
-    }
+  requestFilter(column: string): void {
+    this.filterRequested.emit(column);
+  }
 
-    return this.sortDirection() === "asc" ? "ASC" : "DESC";
+  isSortActive(column: string, direction: SortDirection): boolean {
+    return this.sortColumn() === column && this.sortDirection() === direction;
   }
 
   trackByAbsoluteIndex(_index: number, rowIndex: number): number {

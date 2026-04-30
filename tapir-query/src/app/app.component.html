@@ -44,7 +44,11 @@
             <span class="file-meta">{{ currentFileSizeLabel() }}</span>
           </button>
 
-          <button type="button" class="schema-toggle-icon" [attr.aria-label]="schemaToggleLabel()" [title]="schemaToggleLabel()" (click)="toggleSchemaSidebar()">&#9776;</button>
+          <div class="metadata-tools">
+            <button type="button" class="schema-toggle-icon" [attr.aria-label]="schemaToggleLabel()" [title]="schemaToggleLabel()" (click)="toggleSchemaSidebar()">&#9776;</button>
+            <button type="button" class="icon-button" aria-label="Open settings" title="Settings" (click)="toggleSettings()">&#9881;</button>
+            <button type="button" class="icon-button" aria-label="Open cheat sheet" title="DuckDB cheat sheet" (click)="toggleCheatSheet()">?</button>
+          </div>
         </div>
 
         <div class="query-stack">
@@ -57,43 +61,11 @@
             (queryChange)="onQueryChanged($event)"
             (runRequested)="runQuery()"
           />
-
-          <app-query-error-panel [error]="queryError()" />
-
-          @if (loading()) {
-            <section class="loading-activity" aria-live="polite" aria-busy="true">
-              <div class="loading-activity-head">
-                <span class="loading-spinner" aria-hidden="true"></span>
-                <p class="loading-activity-status">{{ statusMessage() }}</p>
-              </div>
-
-              @if (loadingActivityEntries().length > 0) {
-                <ul class="loading-log-list">
-                  @for (entry of loadingActivityEntries(); track entry.id) {
-                    <li class="loading-log-item" [attr.data-level]="entry.level">
-                      <span class="loading-log-time">{{ formatActivityTime(entry.timestamp) }}</span>
-                      <span class="loading-log-level">{{ entry.level.toUpperCase() }}</span>
-                      <span class="loading-log-source">{{ entry.source }}</span>
-                      <span class="loading-log-message">{{ entry.message }}</span>
-                    </li>
-                  }
-                </ul>
-              }
-            </section>
-          }
-
-          @if (showSlowLoadHint()) {
-            <p class="slow-load-indicator">Loading large result set...</p>
-          }
         </div>
 
-        <div class="action-buttons">
-          <button type="button" class="action-button" [disabled]="loading()" (click)="exportResults()">Export</button>
-
-          <div class="icon-stack">
-            <button type="button" class="icon-button" aria-label="Open settings" title="Settings" (click)="toggleSettings()">&#9881;</button>
-            <button type="button" class="icon-button" aria-label="Open cheat sheet" title="DuckDB cheat sheet" (click)="toggleCheatSheet()">?</button>
-          </div>
+        <div class="command-center">
+          <button type="button" class="action-button execute-button" [disabled]="loading()" (click)="runQuery()">Execute</button>
+          <button type="button" class="action-button export-button" [disabled]="loading()" (click)="exportResults()">Export</button>
         </div>
       </header>
 
@@ -104,17 +76,28 @@
       }
 
       <section class="zone-c data-zone">
-        <app-data-table
-          [columns]="columns()"
-          [rows]="rows()"
-          [totalRows]="totalRowCount()"
-          [windowStartOffset]="windowStartOffset()"
-          [loading]="loading()"
-          [sortColumn]="activeSortColumn()"
-          [sortDirection]="activeSortDirection()"
-          (sortRequested)="onTableSortRequested($event)"
-          (viewportIndexChange)="onTableViewportIndexChanged($event)"
-        />
+        <div class="data-zone-frame">
+          <app-data-table
+            [columns]="columns()"
+            [rows]="rows()"
+            [totalRows]="totalRowCount()"
+            [windowStartOffset]="windowStartOffset()"
+            [loading]="loading()"
+            [sortColumn]="activeSortColumn()"
+            [sortDirection]="activeSortDirection()"
+            (sortRequested)="onTableSortRequested($event)"
+            (filterRequested)="onTableFilterRequested($event)"
+            (viewportIndexChange)="onTableViewportIndexChanged($event)"
+          />
+
+          <app-grid-status-overlay
+            [active]="loading() || queryError() !== null || showSlowLoadHint()"
+            [loading]="loading()"
+            [statusMessage]="showSlowLoadHint() ? 'Loading large result set...' : statusMessage()"
+            [error]="queryError()"
+            [activityEntries]="loadingActivityEntries()"
+          ></app-grid-status-overlay>
+        </div>
       </section>
 
       <footer class="zone-d status-bar">{{ statusMessage() }} • {{ rowStatusLabel() }} • Query took {{ queryElapsedLabel() }}</footer>

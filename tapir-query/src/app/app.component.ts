@@ -6,6 +6,7 @@ import { CheatSheetComponent } from "./features/cheat-sheet/cheat-sheet.componen
 import { DataTableComponent, TableSortRequest } from "./features/data-table/data-table.component";
 import { DragDropDirective } from "./features/drag-drop/drag-drop.directive";
 import { FilePickerComponent } from "./features/file-picker/file-picker.component";
+import { GridStatusOverlayComponent } from "./features/grid-status-overlay/grid-status-overlay.component";
 import { QueryErrorPanelComponent } from "./features/query-error-panel/query-error-panel.component";
 import { SchemaSidebarComponent } from "./features/schema-sidebar/schema-sidebar.component";
 import { SettingsPanelComponent } from "./features/settings-panel/settings-panel.component";
@@ -23,6 +24,7 @@ import { AppTheme, ThemeService } from "./infrastructure/theme.service";
     DataTableComponent,
     DragDropDirective,
     FilePickerComponent,
+    GridStatusOverlayComponent,
     QueryErrorPanelComponent,
     SchemaSidebarComponent,
     SettingsPanelComponent,
@@ -200,6 +202,10 @@ export class AppComponent implements OnDestroy {
 
   onTableSortRequested(request: TableSortRequest): Promise<void> {
     return this.queryService.sortByEntireTableColumn(request.column, request.direction);
+  }
+
+  onTableFilterRequested(columnName: string): void {
+    this.queryService.applyFilterTemplate(columnName);
   }
 
   onTableViewportIndexChanged(index: number): void {

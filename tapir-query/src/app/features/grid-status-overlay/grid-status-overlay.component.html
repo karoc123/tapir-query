@@ -1,0 +1,30 @@
+@if (active()) {
+  <section class="grid-status-overlay" [class.is-loading]="loading()" [class.is-error]="error() !== null" [attr.aria-busy]="loading()" aria-live="polite">
+    <article class="overlay-card">
+      <div class="overlay-head">
+        @if (loading()) {
+          <span class="overlay-spinner" aria-hidden="true"></span>
+        }
+        <p class="overlay-status">{{ error()?.summary ?? statusMessage() }}</p>
+      </div>
+
+      @if (error(); as queryError) {
+        @if (queryError.sqlContext) {
+          <pre class="overlay-context">{{ queryError.sqlContext }}</pre>
+        }
+      }
+
+      @if (loading() && overlayEntries().length > 0) {
+        <ul class="overlay-log-list">
+          @for (entry of overlayEntries(); track entry.id) {
+            <li class="overlay-log-item" [attr.data-level]="entry.level">
+              <span class="overlay-log-level">{{ entry.level.toUpperCase() }}</span>
+              <span class="overlay-log-source">{{ entry.source }}</span>
+              <span class="overlay-log-message">{{ entry.message }}</span>
+            </li>
+          }
+        </ul>
+      }
+    </article>
+  </section>
+}

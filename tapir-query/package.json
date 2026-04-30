@@ -6,7 +6,6 @@
     "start": "ng serve",
     "build": "ng build",
     "tauri:dev": "env -u LD_LIBRARY_PATH -u LD_PRELOAD -u GTK_PATH -u GIO_MODULE_DIR -u GTK_PATH_VSCODE_SNAP_ORIG -u GIO_MODULE_DIR_VSCODE_SNAP_ORIG tauri dev",
-    "fixtures:pull": "node tests/fixtures/pull-samples.mjs",
     "test": "jest --config jest.config.js",
     "test:watch": "jest --config jest.config.js --watch",
     "test:ci": "jest --config jest.config.js --runInBand --coverage",

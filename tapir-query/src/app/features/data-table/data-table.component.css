@@ -23,8 +23,8 @@
 }
 
 .table-head-cell {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.5rem;
   background: color-mix(in srgb, var(--tapir-accent) 5%, var(--tapir-surface-alt));
@@ -34,6 +34,59 @@
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-weight: 700;
+  color: var(--tapir-text-primary);
+}
+
+.table-head-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-head-actions {
+  width: 4.1rem;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.18rem;
+  align-items: center;
+}
+
+.icon-control {
+  width: 1.2rem;
+  height: 1.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--tapir-border-soft);
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--tapir-surface) 82%, transparent);
+  color: var(--tapir-text-muted);
+  padding: 0;
+  cursor: pointer;
+  transition:
+    color 100ms ease,
+    background-color 100ms ease,
+    border-color 100ms ease;
+}
+
+.icon-control svg {
+  width: 0.78rem;
+  height: 0.78rem;
+  fill: currentColor;
+}
+
+.icon-control:hover {
+  color: var(--tapir-text-primary);
+  border-color: var(--tapir-border-strong);
+}
+
+.sort-control.active {
+  background: color-mix(in srgb, var(--tapir-accent) 18%, var(--tapir-surface));
+  color: var(--tapir-accent-strong);
+  border-color: color-mix(in srgb, var(--tapir-accent) 35%, var(--tapir-border));
+}
+
+.filter-control {
   color: var(--tapir-text-primary);
 }
 

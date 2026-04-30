@@ -192,7 +192,7 @@ Consequences:
 - Cleanup automation exists at `tapir-query/scripts/cleanup-desktop.sh`.
 - Architecture and release process are optimized for desktop bundle outputs only.
 
-## 9. Testing and Fixtures
+## 9. Testing
 
 Backend:
 
@@ -202,11 +202,6 @@ Backend:
 Frontend:
 
 - Jest test suites for app shell flow, query service behavior, and data table behavior.
-
-Fixtures:
-
-- Pull script: `tapir-query/tests/fixtures/pull-samples.mjs`
-- Download target: `tapir-query/tests/fixtures/downloads/`
 
 ## 10. Release and Operational Readiness
 

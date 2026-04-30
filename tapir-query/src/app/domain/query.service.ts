@@ -5,6 +5,7 @@ import { LogService } from "../infrastructure/log.service";
 import { PerfService } from "../infrastructure/perf.service";
 import { TauriBridgeService } from "../infrastructure/tauri-bridge.service";
 import { FileService } from "./file.service";
+import { SqlGeneratorService } from "./sql-generator.service";
 
 export type SortDirection = "asc" | "desc";
 
@@ -46,6 +47,7 @@ export class QueryService {
   private readonly errorParser = inject(ErrorParsingService);
   private readonly logs = inject(LogService);
   private readonly perf = inject(PerfService);
+  private readonly sqlGenerator = inject(SqlGeneratorService);
 
   private readonly initialChunkSize = 1_000;
   private readonly streamChunkSize = 1_000;
@@ -248,7 +250,15 @@ export class QueryService {
       return;
     }
 
-    const sql = `SELECT * FROM ${this.escapeIdentifier(tableName)} ` + `ORDER BY ${this.escapeIdentifier(columnName)} ${direction.toUpperCase()}`;
+    const sql = this.sqlGenerator.withOrderBy(this.state().query, columnName, direction, tableName);
+    const nextHistory = this.computeNextHistory(this.state().queryHistory, sql);
+    this.persistHistory(nextHistory);
+
+    this.patch({
+      query: sql,
+      queryHistory: nextHistory,
+      queryError: null,
+    });
 
     this.logs.info("query", "Sorting full dataset by column", {
       columnName,
@@ -264,6 +274,27 @@ export class QueryService {
       statusOnStart: `Sorting full dataset by ${columnName} (${direction.toUpperCase()})...`,
       statusOnFinish: (totalRows, elapsedMs, loadedRows) =>
         `Sorted ${totalRows.toLocaleString()} rows by ${columnName} (${direction.toUpperCase()}) in ${elapsedMs} ms (showing ${loadedRows.toLocaleString()}).`,
+    });
+  }
+
+  applyFilterTemplate(columnName: string): void {
+    const tableName = this.fileService.currentTable();
+    if (!tableName) {
+      this.patch({
+        queryError: this.parseError("Open a CSV file before adding a filter."),
+      });
+      return;
+    }
+
+    const sql = this.sqlGenerator.withFilterTemplate(this.state().query, columnName, tableName);
+    this.patch({
+      query: sql,
+      queryError: null,
+      statusMessage: `Filter template added for ${columnName}. Edit value and execute query.`,
+    });
+
+    this.logs.info("query", "Filter template inserted for column", {
+      columnName,
     });
   }
 
@@ -814,10 +845,6 @@ export class QueryService {
     }
 
     return `${normalized} LIMIT ${this.initialChunkSize}`;
-  }
-
-  private escapeIdentifier(identifier: string): string {
-    return `"${identifier.replace(/"/g, '""')}"`;
   }
 
   private parseError(error: unknown): ParsedQueryError {

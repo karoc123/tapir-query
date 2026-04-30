@@ -37,4 +37,32 @@ describe("DataTableComponent", () => {
 
     expect(emitted).toEqual([{ column: "amount", direction: "desc" }]);
   });
+
+  it("emits explicit ascending sort request", () => {
+    const fixture = TestBed.createComponent(DataTableComponent);
+    const component = fixture.componentInstance;
+    const emitted: Array<{ column: string; direction: "asc" | "desc" }> = [];
+
+    fixture.componentRef.setInput("columns", ["amount"]);
+    component.sortRequested.subscribe((payload) => emitted.push(payload));
+    fixture.detectChanges();
+
+    component.requestSort("amount", "asc");
+
+    expect(emitted).toEqual([{ column: "amount", direction: "asc" }]);
+  });
+
+  it("emits filter request for the selected column", () => {
+    const fixture = TestBed.createComponent(DataTableComponent);
+    const component = fixture.componentInstance;
+    const emitted: string[] = [];
+
+    fixture.componentRef.setInput("columns", ["currency"]);
+    component.filterRequested.subscribe((column) => emitted.push(column));
+    fixture.detectChanges();
+
+    component.requestFilter("currency");
+
+    expect(emitted).toEqual(["currency"]);
+  });
 });

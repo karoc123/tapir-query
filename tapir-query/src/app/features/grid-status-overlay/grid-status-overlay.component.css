@@ -1,0 +1,112 @@
+:host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 12;
+}
+
+.grid-status-overlay {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  right: 0.6rem;
+  display: flex;
+  justify-content: center;
+}
+
+.overlay-card {
+  width: min(64rem, 100%);
+  border: 1px solid color-mix(in srgb, var(--tapir-accent) 34%, var(--tapir-border));
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--tapir-surface) 74%, transparent);
+  backdrop-filter: blur(9px);
+  box-shadow: 0 10px 26px var(--tapir-panel-shadow);
+  padding: 0.52rem 0.64rem;
+  display: grid;
+  gap: 0.38rem;
+}
+
+.overlay-head {
+  display: flex;
+  align-items: center;
+  gap: 0.46rem;
+}
+
+.overlay-spinner {
+  width: 0.82rem;
+  height: 0.82rem;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, var(--tapir-accent) 28%, transparent);
+  border-top-color: var(--tapir-accent-strong);
+  animation: overlay-spin 760ms linear infinite;
+}
+
+.overlay-status {
+  margin: 0;
+  font-size: 0.73rem;
+  line-height: 1.35;
+  color: var(--tapir-text-primary);
+  font-weight: 600;
+}
+
+.overlay-context {
+  margin: 0;
+  border: 1px solid var(--tapir-error-border);
+  border-radius: 0.44rem;
+  background: color-mix(in srgb, var(--tapir-error-bg) 82%, transparent);
+  color: var(--tapir-error-text);
+  padding: 0.42rem;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.overlay-log-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.overlay-log-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  font-size: 0.65rem;
+  color: var(--tapir-text-muted);
+}
+
+.overlay-log-item[data-level="error"] {
+  color: #ef4444;
+}
+
+.overlay-log-level {
+  min-width: 2.1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+
+.overlay-log-source {
+  font-weight: 700;
+  color: var(--tapir-text-primary);
+}
+
+.overlay-log-message {
+  color: var(--tapir-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grid-status-overlay.is-error .overlay-card {
+  border-color: var(--tapir-error-border);
+}
+
+@keyframes overlay-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
