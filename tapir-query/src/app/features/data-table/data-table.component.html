@@ -4,7 +4,7 @@
   } @else {
     <div class="table-header" [style.gridTemplateColumns]="gridTemplateColumns()">
       @for (column of columns(); track column) {
-        <div class="table-head-cell" role="columnheader" [attr.aria-label]="column">
+        <div class="table-head-cell" role="columnheader" [attr.aria-label]="column" [class.filter-open]="isFilterOpen(column)">
           <span class="table-head-title" [title]="column">{{ column }}</span>
 
           <div class="table-head-actions" aria-label="Column actions">
@@ -34,12 +34,42 @@
               </svg>
             </button>
 
-            <button type="button" class="icon-control filter-control" [title]="'Insert filter for ' + column" (click)="requestFilter(column)">
+            <button
+              type="button"
+              class="icon-control filter-control"
+              [class.active]="isFilterOpen(column)"
+              [attr.aria-expanded]="isFilterOpen(column)"
+              [title]="'Filter ' + column"
+              (click)="toggleFilterEditor(column)"
+            >
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 5h16l-6 7v5l-4 2v-7Z" />
               </svg>
             </button>
           </div>
+
+          @if (isFilterOpen(column)) {
+            <div class="filter-popover" [attr.aria-label]="'Filter options for ' + column" role="group">
+              <label class="filter-field">
+                <span class="filter-label">Operator</span>
+                <select class="filter-select" [value]="activeFilterOperator()" (change)="onFilterOperatorChanged($event)">
+                  @for (option of filterOperatorOptions; track option.value) {
+                    <option [value]="option.value">{{ option.label }}</option>
+                  }
+                </select>
+              </label>
+
+              <label class="filter-field">
+                <span class="filter-label">Value</span>
+                <input class="filter-input" type="text" [value]="activeFilterValue()" placeholder="Type value" (input)="onFilterValueInput($event)" (keydown.enter)="applyActiveFilter()" />
+              </label>
+
+              <div class="filter-actions-row">
+                <button type="button" class="filter-action secondary" (click)="closeFilterEditor()">Cancel</button>
+                <button type="button" class="filter-action primary" [disabled]="isFilterApplyDisabled()" (click)="applyActiveFilter()">Apply</button>
+              </div>
+            </div>
+          }
         </div>
       }
     </div>

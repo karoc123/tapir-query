@@ -55,14 +55,58 @@ describe("DataTableComponent", () => {
   it("emits filter request for the selected column", () => {
     const fixture = TestBed.createComponent(DataTableComponent);
     const component = fixture.componentInstance;
-    const emitted: string[] = [];
+    const emitted: Array<{ columnName: string; operator: string; value: string }> = [];
 
     fixture.componentRef.setInput("columns", ["currency"]);
-    component.filterRequested.subscribe((column) => emitted.push(column));
+    component.filterRequested.subscribe((payload) => emitted.push(payload));
     fixture.detectChanges();
 
-    component.requestFilter("currency");
+    const operatorSelect = document.createElement("select");
+    const containsOption = document.createElement("option");
+    containsOption.value = "contains";
+    containsOption.text = "Contains";
+    operatorSelect.appendChild(containsOption);
+    operatorSelect.value = "contains";
 
-    expect(emitted).toEqual(["currency"]);
+    const valueInput = document.createElement("input");
+    valueInput.value = " chf ";
+
+    component.toggleFilterEditor("currency");
+    component.onFilterOperatorChanged({
+      target: operatorSelect,
+    } as unknown as Event);
+    component.onFilterValueInput({
+      target: valueInput,
+    } as unknown as Event);
+    component.applyActiveFilter();
+
+    expect(emitted).toEqual([
+      {
+        columnName: "currency",
+        operator: "contains",
+        value: "chf",
+      },
+    ]);
+  });
+
+  it("does not emit filter request when value is empty", () => {
+    const fixture = TestBed.createComponent(DataTableComponent);
+    const component = fixture.componentInstance;
+    const emitted: Array<{ columnName: string; operator: string; value: string }> = [];
+
+    fixture.componentRef.setInput("columns", ["currency"]);
+    component.filterRequested.subscribe((payload) => emitted.push(payload));
+    fixture.detectChanges();
+
+    const valueInput = document.createElement("input");
+    valueInput.value = "   ";
+
+    component.toggleFilterEditor("currency");
+    component.onFilterValueInput({
+      target: valueInput,
+    } as unknown as Event);
+    component.applyActiveFilter();
+
+    expect(emitted).toEqual([]);
   });
 });

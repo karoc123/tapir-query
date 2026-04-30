@@ -21,7 +21,7 @@
   display: grid;
   gap: 0;
   border-bottom: 1px solid var(--tapir-border);
-  overflow: hidden;
+  overflow: visible;
   flex-shrink: 0;
 }
 
@@ -30,6 +30,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.5rem;
+  position: relative;
   background: color-mix(in srgb, var(--tapir-accent) 5%, var(--tapir-surface-alt));
   border-right: 1px solid var(--tapir-border-soft);
   padding: 0.6rem 0.7rem;
@@ -38,6 +39,10 @@
   letter-spacing: 0.1em;
   font-weight: 700;
   color: var(--tapir-text-primary);
+}
+
+.table-head-cell.filter-open {
+  z-index: 3;
 }
 
 .table-head-title {
@@ -91,6 +96,94 @@
 
 .filter-control {
   color: var(--tapir-text-primary);
+}
+
+.filter-control.active {
+  background: color-mix(in srgb, var(--tapir-accent) 18%, var(--tapir-surface));
+  color: var(--tapir-accent-strong);
+  border-color: color-mix(in srgb, var(--tapir-accent) 35%, var(--tapir-border));
+}
+
+.filter-popover {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0.35rem;
+  width: min(17rem, calc(100vw - 2.8rem));
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.55rem;
+  border-radius: 0.55rem;
+  border: 1px solid var(--tapir-border-strong);
+  background: color-mix(in srgb, var(--tapir-surface) 94%, black 6%);
+  box-shadow:
+    0 10px 26px color-mix(in srgb, black 26%, transparent),
+    0 2px 8px color-mix(in srgb, black 18%, transparent);
+  z-index: 6;
+}
+
+.filter-field {
+  display: grid;
+  gap: 0.24rem;
+}
+
+.filter-label {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--tapir-text-muted);
+}
+
+.filter-select,
+.filter-input {
+  width: 100%;
+  border: 1px solid var(--tapir-border-soft);
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--tapir-surface-alt) 78%, var(--tapir-surface));
+  color: var(--tapir-text-primary);
+  font-size: 0.72rem;
+  padding: 0.44rem 0.52rem;
+}
+
+.filter-input::placeholder {
+  color: var(--tapir-text-muted);
+}
+
+.filter-select:focus,
+.filter-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--tapir-accent) 58%, var(--tapir-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tapir-accent) 24%, transparent);
+}
+
+.filter-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.36rem;
+}
+
+.filter-action {
+  border: 1px solid var(--tapir-border-soft);
+  border-radius: 0.4rem;
+  padding: 0.34rem 0.58rem;
+  font-size: 0.64rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filter-action.secondary {
+  background: color-mix(in srgb, var(--tapir-surface-alt) 88%, var(--tapir-surface));
+  color: var(--tapir-text-primary);
+}
+
+.filter-action.primary {
+  background: color-mix(in srgb, var(--tapir-accent) 30%, var(--tapir-surface));
+  color: var(--tapir-accent-strong);
+  border-color: color-mix(in srgb, var(--tapir-accent) 42%, var(--tapir-border));
+}
+
+.filter-action:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
 }
 
 .table-head-cell:last-child {

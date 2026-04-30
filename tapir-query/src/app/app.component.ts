@@ -3,7 +3,7 @@ import { afterNextRender, Component, computed, effect, inject, OnDestroy } from 
 import { DatasetMetricsService } from "./domain/dataset-metrics.service";
 import { FileService } from "./domain/file.service";
 import { QueryService } from "./domain/query.service";
-import type { FilterOperator } from "./domain/sql-generator.service";
+import type { FilterIntent } from "./domain/sql-generator.service";
 import { CheatSheetComponent } from "./features/cheat-sheet/cheat-sheet.component";
 import { DataTableComponent, TableSortRequest } from "./features/data-table/data-table.component";
 import { DragDropDirective } from "./features/drag-drop/drag-drop.directive";
@@ -245,22 +245,8 @@ export class AppComponent implements OnDestroy {
     return this.queryService.sortByEntireTableColumn(request.column, request.direction);
   }
 
-  onTableFilterRequested(columnName: string): void {
-    const operator = this.promptFilterOperator(columnName);
-    if (operator === null) {
-      return;
-    }
-
-    const value = this.promptFilterValue(columnName);
-    if (value === null) {
-      return;
-    }
-
-    this.queryService.applyFilterIntent({
-      columnName,
-      value,
-      operator,
-    });
+  onTableFilterRequested(intent: FilterIntent): void {
+    this.queryService.applyFilterIntent(intent);
   }
 
   onTableViewportIndexChanged(index: number): void {
@@ -300,77 +286,6 @@ export class AppComponent implements OnDestroy {
 
   formatActivityTime(timestamp: number): string {
     return `${(timestamp / 1000).toFixed(1)}s`;
-  }
-
-  private promptFilterOperator(columnName: string): FilterOperator | null {
-    if (typeof window === "undefined" || typeof window.prompt !== "function") {
-      this.queryService.reportError("Filter prompts are unavailable in this runtime.");
-      return null;
-    }
-
-    const response = window.prompt(`Operator for ${columnName} (=, !=, >, >=, <, <=, contains, startsWith, endsWith)`, "=");
-
-    if (response === null) {
-      return null;
-    }
-
-    const normalized = this.normalizeFilterOperator(response);
-    if (normalized === null) {
-      this.queryService.reportError("Unsupported filter operator. Use one of: =, !=, >, >=, <, <=, contains, startsWith, endsWith.");
-      return null;
-    }
-
-    return normalized;
-  }
-
-  private promptFilterValue(columnName: string): string | null {
-    if (typeof window === "undefined" || typeof window.prompt !== "function") {
-      this.queryService.reportError("Filter prompts are unavailable in this runtime.");
-      return null;
-    }
-
-    const response = window.prompt(`Filter value for ${columnName}`, "");
-    if (response === null) {
-      return null;
-    }
-
-    const normalized = response.trim();
-    if (normalized.length === 0) {
-      this.queryService.reportError("Filter value cannot be empty.");
-      return null;
-    }
-
-    return normalized;
-  }
-
-  private normalizeFilterOperator(operator: string): FilterOperator | null {
-    const normalized = operator.trim().toLowerCase();
-    const operators: Record<string, FilterOperator> = {
-      "=": "equals",
-      eq: "equals",
-      equals: "equals",
-      "!=": "notEquals",
-      "<>": "notEquals",
-      neq: "notEquals",
-      notequals: "notEquals",
-      ">": "greaterThan",
-      gt: "greaterThan",
-      greaterthan: "greaterThan",
-      ">=": "greaterOrEqual",
-      gte: "greaterOrEqual",
-      greaterorequal: "greaterOrEqual",
-      "<": "lessThan",
-      lt: "lessThan",
-      lessthan: "lessThan",
-      "<=": "lessOrEqual",
-      lte: "lessOrEqual",
-      lessorequal: "lessOrEqual",
-      contains: "contains",
-      startswith: "startsWith",
-      endswith: "endsWith",
-    };
-
-    return operators[normalized] ?? null;
   }
 
   private async attachNativeDropLogger(): Promise<void> {
