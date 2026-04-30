@@ -104,7 +104,7 @@ jobs:
 
           node -e "const fs=require('fs'); const pkgPath='package.json'; const tauriPath='src-tauri/tauri.conf.json'; const pkg=JSON.parse(fs.readFileSync(pkgPath,'utf8')); pkg.version=process.env.RELEASE_VERSION; fs.writeFileSync(pkgPath, JSON.stringify(pkg,null,2)+'\\n'); const tc=JSON.parse(fs.readFileSync(tauriPath,'utf8')); tc.version=process.env.RELEASE_VERSION; fs.writeFileSync(tauriPath, JSON.stringify(tc,null,2)+'\\n');"
 
-          node -e "const fs=require('fs'); const cargoPath='src-tauri/Cargo.toml'; const src=fs.readFileSync(cargoPath,'utf8'); const next=src.replace(/(^version\s*=\s*")([^"]+)("\s*$)/m, `$1${process.env.RELEASE_VERSION}$3`); fs.writeFileSync(cargoPath,next);"
+          node -e 'const fs=require("fs"); const cargoPath="src-tauri/Cargo.toml"; const src=fs.readFileSync(cargoPath,"utf8"); const next=src.replace(/(^version\s*=\s*")([^"]+)("\s*$)/m, (_match, prefix, _current, suffix) => prefix + process.env.RELEASE_VERSION + suffix); fs.writeFileSync(cargoPath,next);'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -168,7 +168,7 @@ jobs:
 
           node -e "const fs=require('fs'); const pkgPath='package.json'; const tauriPath='src-tauri/tauri.conf.json'; const pkg=JSON.parse(fs.readFileSync(pkgPath,'utf8')); pkg.version=process.env.RELEASE_VERSION; fs.writeFileSync(pkgPath, JSON.stringify(pkg,null,2)+'\\n'); const tc=JSON.parse(fs.readFileSync(tauriPath,'utf8')); tc.version=process.env.RELEASE_VERSION; fs.writeFileSync(tauriPath, JSON.stringify(tc,null,2)+'\\n');"
 
-          node -e "const fs=require('fs'); const cargoPath='src-tauri/Cargo.toml'; const src=fs.readFileSync(cargoPath,'utf8'); const next=src.replace(/(^version\s*=\s*")([^"]+)("\s*$)/m, `$1${process.env.RELEASE_VERSION}$3`); fs.writeFileSync(cargoPath,next);"
+          node -e 'const fs=require("fs"); const cargoPath="src-tauri/Cargo.toml"; const src=fs.readFileSync(cargoPath,"utf8"); const next=src.replace(/(^version\s*=\s*")([^"]+)("\s*$)/m, (_match, prefix, _current, suffix) => prefix + process.env.RELEASE_VERSION + suffix); fs.writeFileSync(cargoPath,next);'
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

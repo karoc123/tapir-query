@@ -6,6 +6,14 @@ Built with Tauri v2, Rust, DuckDB, and Angular 21 (Standalone + Signals), it pro
 
 ## Quick Start
 
+0. If rust and cargo are not installed, install Rust toolchain:
+
+```bash
+sudo apt update && sudo apt install curl build-essential -y
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+```
+
 1. Install dependencies.
 
 ```bash
