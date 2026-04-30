@@ -48,6 +48,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::csv_commands::open_file,
             commands::csv_commands::execute_query,
+            commands::csv_commands::run_column_profile_metric,
             commands::csv_commands::start_query_session,
             commands::csv_commands::read_query_session_chunk,
             commands::csv_commands::close_query_session,

@@ -5,6 +5,7 @@
 Tapir Query is a desktop-first, local analytics workbench for CSV exploration.
 
 Core objectives:
+
 - Fast SQL iteration on local files without server dependencies.
 - Predictable memory usage through bounded result windows.
 - Strict Rust/TypeScript IPC contracts.
@@ -14,9 +15,9 @@ Core objectives:
 
 ```mermaid
 flowchart LR
-  UI[Angular 21 UI<br/>Standalone Components + Signals] --> Domain[Domain Services<br/>FileService / QueryService / DatasetMetricsService]
+  UI[Angular 21 UI<br/>Standalone Components + Signals] --> Domain[Domain Services<br/>FileService / QueryService / DatasetMetricsService / DataAnalysisPluginService]
   Domain --> Bridge[TauriBridgeService<br/>Typed invoke wrapper]
-  Bridge --> Cmd[Tauri Commands<br/>open_file / execute_query / start_query_session / read_query_session_chunk / close_query_session / export_csv / export_rows]
+  Bridge --> Cmd[Tauri Commands<br/>open_file / execute_query / run_column_profile_metric / start_query_session / read_query_session_chunk / close_query_session / export_csv / export_rows]
   Cmd --> Svc[CsvQueryService]
   Svc --> Engine[DuckDbEngine]
   Engine --> DuckDB[(Embedded DuckDB)]
@@ -52,6 +53,7 @@ src-tauri/src/
   - Tauri command boundary and DTO mapping.
   - Uses `tauri::State<AppState>` for service access.
   - Offloads blocking work to `spawn_blocking`.
+  - Includes `run_column_profile_metric` for exact per-column profiling jobs.
 
 - `domain/csv_query_service.rs`
   - Orchestration between command layer and engine.
@@ -60,7 +62,7 @@ src-tauri/src/
 
 - `engine/duckdb_engine.rs`
   - Concrete `CsvQueryEngine` implementation.
-  - Executes SQL, schema inspection, paging, export, and session storage.
+  - Executes SQL, schema inspection, paging, export, session storage, and exact column profiling metrics.
 
 - `error.rs`
   - Typed app error taxonomy: `Validation`, `Io`, `Sql`, `State`.
@@ -84,6 +86,7 @@ src-tauri/src/
 
 - `open_file`
 - `execute_query`
+- `run_column_profile_metric`
 - `start_query_session`
 - `read_query_session_chunk`
 - `close_query_session`
@@ -102,6 +105,7 @@ src/app/
     file.service.ts
     query.service.ts
     dataset-metrics.service.ts
+    data-analysis-plugin.service.ts
     ingestion.service.ts
     sql-generator.service.ts
   infrastructure/
@@ -113,6 +117,7 @@ src/app/
     perf.service.ts
     theme.service.ts
   features/
+    data-analysis-dashboard/
     drag-drop/
     file-picker/
     sql-editor/
@@ -139,7 +144,15 @@ src/app/
 
 - `LayoutStateService`
   - Empty vs loaded layout mode.
-  - Sidebar and cheat-sheet panel state.
+  - Cheat-sheet and on-demand analysis panel state.
+  - Columns sidebar is coupled to analysis mode and shown only while analysis is open.
+
+- `DataAnalysisPluginService`
+  - Isolated plugin state machine for background profiling.
+  - Profiles only columns that the user drags from the Columns sidebar into the analysis drop zone.
+  - No profiling run starts until at least one column is dropped.
+  - Incrementally resolves per-column metric cards (completeness, cardinality, string length).
+  - Uses request-token cancellation so stale runs cannot overwrite active UI state.
 
 - `ThemeService`
   - Theme selection and settings panel state with storage persistence.
@@ -150,10 +163,14 @@ src/app/
   - Drag-and-drop zone.
   - Native file picker CTA.
 
-- Loaded mode (four-zone layout)
+- Loaded mode (base four-zone layout)
   - Zone A: action bar (file pill, SQL editor, execute/export).
-  - Zone B: collapsible schema sidebar.
-  - Zone C: data table with overlays and virtualization.
+  - Zone B: Columns sidebar (visible only in analysis mode; drag source for analysis charts).
+  - Zone C: data area.
+    - Default: data table with overlays and virtualization.
+    - Analysis mode: split-view with top analysis dashboard drop zone and bottom data table.
+      - Initial state: instructional empty drop area (no charts rendered).
+      - After drop: charts render for each dropped column (one card per column).
   - Zone D: status bar (query status, row status, elapsed time).
 
 ## 5. Query Execution Modes
@@ -161,21 +178,25 @@ src/app/
 ### 5.1 Active Mode: Direct Query Execution
 
 Current primary runtime path:
+
 - `QueryService` open/run/sort flows call `execute_query` directly.
 - First page is fetched with bounded `limit` and `offset`.
 - `effectiveSql` stores the exact SQL used for the shown result.
 
 Why this mode is active:
+
 - Reliability mitigation during runtime hang investigations.
 
 ### 5.2 Implemented but Non-Primary: Session Streaming
 
 Implemented backend + frontend methods remain:
+
 - `start_query_session`
 - `read_query_session_chunk`
 - `close_query_session`
 
 Current status:
+
 - Session streaming orchestration exists in `QueryService` but is not the default call path for open/run/sort.
 - Streaming remains available as fallback-capable logic and for targeted diagnostics.
 
@@ -193,6 +214,10 @@ Current status:
 - Backend normalizes projection cells to `VARCHAR` or null.
 - Pagination fields: `limit`, `offset`, `nextOffset`.
 - Timing field: `elapsedMs`.
+- Profiling contracts include:
+  - Metric discriminator (`cardinalityTopValues`, `completenessAudit`, `stringLengthHistogram`).
+  - Incremental single-metric payloads per column.
+  - Exact full-dataset aggregates and histogram buckets.
 
 ### 6.3 Bridge Layer
 
@@ -208,6 +233,7 @@ Current status:
 - CodeMirror editor instance and effects are destroyed in `SqlEditorComponent.ngOnDestroy`.
 - `LogService` keeps a bounded in-memory ring (max 500 entries).
 - Query slow-load timer and metrics refresh timer are explicitly cleared.
+- Analysis plugin run state is request-token guarded and cancelled when panel closes.
 
 ### 7.2 Backend
 
@@ -221,6 +247,7 @@ Current status:
 ### 8.1 Tauri Capabilities
 
 Current capability (`capabilities/default.json`) grants:
+
 - `core:default`
 - `dialog:default`
 - `opener:default`
@@ -245,6 +272,9 @@ This is functional but not strict least privilege.
 - `read_csv_auto` uses bounded `SAMPLE_SIZE=20000`.
 - UI table rendering uses virtual scrolling.
 - Dynamic imports are used for some Tauri-only browser APIs.
+- Analysis profiling is queued with bounded frontend concurrency and async IPC jobs.
+- Analysis profiling is demand-driven and starts only after a column is dropped into the analysis area.
+- Profiling timings are tracked separately (`analysisBatch`, `analysisProfile`, `analysisRoundTrip`).
 
 ### 9.2 Known Trade-offs
 
@@ -272,6 +302,7 @@ This is functional but not strict least privilege.
 ## 11. Architectural Risks and Next Actions
 
 Priority actions:
+
 1. Make `productName` config-valid to restore dev runtime boot.
 2. Tighten capabilities to least privilege (especially opener/core scope).
 3. Define production CSP.

@@ -1,0 +1,130 @@
+<section class="analysis-dashboard" aria-live="polite">
+  <header class="analysis-header">
+    <div class="analysis-title-stack">
+      <p class="analysis-kicker">Data Analysis Plugin</p>
+      <h2>Exact Column Profiling</h2>
+      <p class="analysis-subtitle">Metrics are computed on the full active query result.</p>
+    </div>
+
+    <div class="analysis-progress" [attr.aria-busy]="running()">
+      <p>{{ running() ? "Profiling in background" : "Profiling complete" }}</p>
+      <p class="analysis-progress-label">{{ progressLabel() }}</p>
+      <div class="analysis-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="(completionRatio() * 100).toFixed(0)">
+        <span class="analysis-progress-fill" [style.width]="toPercent(completionRatio(), 1)"></span>
+      </div>
+    </div>
+  </header>
+
+  <div class="analysis-content" [class.drag-active]="dropActive()" (dragover)="onDropZoneDragOver($event)" (dragleave)="onDropZoneDragLeave($event)" (drop)="onDropZoneDrop($event)">
+    @if (columns().length === 0) {
+      <div class="analysis-empty-state">
+        <p class="analysis-empty-copy">Ziehe eine Column aus der Columns-Ansicht in diesen Bereich, um Charts zu laden.</p>
+      </div>
+    } @else {
+      <div class="analysis-column-grid">
+        @for (column of columns(); track trackByColumn($index, column)) {
+          <article class="analysis-column-card">
+            <header class="analysis-column-head">
+              <div class="analysis-column-title">
+                <h3>{{ column.columnName }}</h3>
+                <p>{{ column.dataType }}</p>
+              </div>
+              <button type="button" class="analysis-remove-column" [attr.aria-label]="'Remove ' + column.columnName" [title]="'Remove ' + column.columnName" (click)="removeColumn(column.columnName)">
+                &times;
+              </button>
+            </header>
+
+            <section class="metric-card">
+              <header>
+                <h4>Completeness Audit</h4>
+                @if (column.completeness.elapsedMs !== null) {
+                  <span>{{ column.completeness.elapsedMs }} ms</span>
+                }
+              </header>
+
+              @if (column.completeness.status === "loading") {
+                <div class="metric-loading">Computing completeness...</div>
+              } @else if (column.completeness.status === "error") {
+                <div class="metric-error">{{ column.completeness.error }}</div>
+              } @else if (column.completeness.value; as audit) {
+                <div class="completeness-bar">
+                  <span class="completeness-fill" [style.width]="toPercent(audit.populated, audit.populated + audit.emptyOrNull)"></span>
+                </div>
+                <div class="completeness-meta">
+                  <span>Populated: {{ audit.populated.toLocaleString() }}</span>
+                  <span>Empty/Null: {{ audit.emptyOrNull.toLocaleString() }}</span>
+                  <span>{{ completionPercentage(audit) }}%</span>
+                </div>
+              }
+            </section>
+
+            <section class="metric-card">
+              <header>
+                <h4>Cardinality Top 10</h4>
+                @if (column.cardinality.elapsedMs !== null) {
+                  <span>{{ column.cardinality.elapsedMs }} ms</span>
+                }
+              </header>
+
+              @if (column.cardinality.status === "loading") {
+                <div class="metric-loading">Computing top values...</div>
+              } @else if (column.cardinality.status === "error") {
+                <div class="metric-error">{{ column.cardinality.error }}</div>
+              } @else if (column.cardinality.value; as cardinality) {
+                <p class="metric-summary">Unique values: {{ cardinality.uniqueValueCount.toLocaleString() }}</p>
+                <ul class="metric-list">
+                  @for (entry of cardinality.topValues; track entry.value) {
+                    <li>
+                      <div class="metric-list-label">
+                        <span>{{ entry.value }}</span>
+                        <span>{{ entry.frequency.toLocaleString() }}</span>
+                      </div>
+                      <div class="metric-list-track">
+                        <span [style.width]="toPercent(entry.frequency, maxCardinalityFrequency(cardinality))"></span>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              }
+            </section>
+
+            <section class="metric-card">
+              <header>
+                <h4>String Length Profile</h4>
+                @if (column.stringLength.elapsedMs !== null) {
+                  <span>{{ column.stringLength.elapsedMs }} ms</span>
+                }
+              </header>
+
+              @if (column.stringLength.status === "loading") {
+                <div class="metric-loading">Computing length histogram...</div>
+              } @else if (column.stringLength.status === "error") {
+                <div class="metric-error">{{ column.stringLength.error }}</div>
+              } @else if (column.stringLength.value; as histogram) {
+                <div class="metric-summary-row">
+                  <span>Rows: {{ histogram.nonEmptyRows.toLocaleString() }}</span>
+                  <span>Min: {{ histogram.minLength ?? "-" }}</span>
+                  <span>Max: {{ histogram.maxLength ?? "-" }}</span>
+                  <span>Avg: {{ histogram.averageLength ?? "-" }}</span>
+                </div>
+                <ul class="metric-list histogram">
+                  @for (bucket of histogram.buckets; track bucket.label) {
+                    <li>
+                      <div class="metric-list-label">
+                        <span>{{ bucket.label }}</span>
+                        <span>{{ bucket.frequency.toLocaleString() }}</span>
+                      </div>
+                      <div class="metric-list-track">
+                        <span [style.width]="toPercent(bucket.frequency, maxHistogramFrequency(histogram))"></span>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              }
+            </section>
+          </article>
+        }
+      </div>
+    }
+  </div>
+</section>

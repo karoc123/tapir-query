@@ -1,5 +1,6 @@
 import { CommonModule } from "@angular/common";
-import { afterNextRender, Component, computed, effect, inject, OnDestroy } from "@angular/core";
+import { afterNextRender, Component, computed, effect, inject, OnDestroy, signal, untracked } from "@angular/core";
+import { DataAnalysisPluginService } from "./domain/data-analysis-plugin.service";
 import { DatasetMetricsService } from "./domain/dataset-metrics.service";
 import { FileService } from "./domain/file.service";
 import { IngestionService } from "./domain/ingestion.service";
@@ -7,6 +8,7 @@ import { QueryService } from "./domain/query.service";
 import type { FilterIntent } from "./domain/sql-generator.service";
 import { CheatSheetComponent } from "./features/cheat-sheet/cheat-sheet.component";
 import { DataTableComponent, TableSortRequest } from "./features/data-table/data-table.component";
+import { DataAnalysisDashboardComponent } from "./features/data-analysis-dashboard/data-analysis-dashboard.component";
 import { DragDropDirective } from "./features/drag-drop/drag-drop.directive";
 import { FilePickerComponent } from "./features/file-picker/file-picker.component";
 import { GridStatusOverlayComponent } from "./features/grid-status-overlay/grid-status-overlay.component";
@@ -17,6 +19,7 @@ import { SqlEditorComponent } from "./features/sql-editor/sql-editor.component";
 import { LayoutStateService } from "./infrastructure/layout-state.service";
 import { LogService } from "./infrastructure/log.service";
 import { PerfService } from "./infrastructure/perf.service";
+import { ColumnSchema } from "./infrastructure/tauri-contracts";
 import { AppTheme, ThemeService } from "./infrastructure/theme.service";
 
 @Component({
@@ -25,6 +28,7 @@ import { AppTheme, ThemeService } from "./infrastructure/theme.service";
     CommonModule,
     CheatSheetComponent,
     DataTableComponent,
+    DataAnalysisDashboardComponent,
     DragDropDirective,
     FilePickerComponent,
     GridStatusOverlayComponent,
@@ -39,6 +43,7 @@ import { AppTheme, ThemeService } from "./infrastructure/theme.service";
 export class AppComponent implements OnDestroy {
   private readonly fileService = inject(FileService);
   private readonly queryService = inject(QueryService);
+  private readonly dataAnalysisPluginService = inject(DataAnalysisPluginService);
   private readonly datasetMetricsService = inject(DatasetMetricsService);
   private readonly ingestionService = inject(IngestionService);
   private readonly layoutState = inject(LayoutStateService);
@@ -70,8 +75,13 @@ export class AppComponent implements OnDestroy {
 
   readonly isEmptyLayout = this.layoutState.isEmpty;
   readonly isLoadedLayout = this.layoutState.isLoaded;
-  readonly schemaCollapsed = this.layoutState.schemaCollapsed;
   readonly cheatSheetOpen = this.layoutState.cheatSheetOpen;
+  readonly analysisPanelOpen = this.layoutState.analysisPanelOpen;
+
+  readonly analysisColumnProfiles = this.dataAnalysisPluginService.columnProfiles;
+  readonly analysisRunning = this.dataAnalysisPluginService.running;
+  readonly analysisProgressLabel = this.dataAnalysisPluginService.progressLabel;
+  readonly analysisCompletionRatio = this.dataAnalysisPluginService.completionRatio;
 
   readonly activeTheme = this.themeService.theme;
   readonly settingsOpen = this.themeService.settingsOpen;
@@ -112,7 +122,9 @@ export class AppComponent implements OnDestroy {
     return `${elapsed.toFixed(1)} ms`;
   });
 
-  readonly schemaToggleLabel = computed(() => (this.schemaCollapsed() ? "Show Columns" : "Hide Columns"));
+  readonly analysisToggleLabel = computed(() => (this.analysisPanelOpen() ? "Hide Data Analysis" : "Show Data Analysis"));
+
+  private readonly analysisSelectedColumnNames = signal<string[]>([]);
 
   readonly loadingActivityEntries = computed(() =>
     this.logEntries()
@@ -136,6 +148,47 @@ export class AppComponent implements OnDestroy {
       this.datasetMetricsService.refresh(effectiveSql, tableName);
     });
 
+    effect(() => {
+      const analysisOpen = this.analysisPanelOpen();
+      if (!analysisOpen) {
+        untracked(() => {
+          this.analysisSelectedColumnNames.set([]);
+          this.dataAnalysisPluginService.disable();
+        });
+        return;
+      }
+
+      untracked(() => {
+        this.dataAnalysisPluginService.enable();
+      });
+
+      const loading = this.loading();
+      const queryError = this.queryError();
+      const tableName = this.currentTable();
+      const effectiveSql = this.effectiveSql();
+      const columns = this.schemaColumns();
+      const selectedColumnNames = this.analysisSelectedColumnNames();
+      const selectedColumns = this.resolveSelectedAnalysisColumns(columns, selectedColumnNames);
+
+      if (selectedColumns.length !== selectedColumnNames.length) {
+        untracked(() => {
+          this.analysisSelectedColumnNames.set(selectedColumns.map((column) => column.name));
+        });
+      }
+
+      if (loading || queryError !== null || !tableName || !effectiveSql) {
+        return;
+      }
+
+      untracked(() => {
+        this.dataAnalysisPluginService.refresh({
+          tableName,
+          sql: effectiveSql,
+          columns: selectedColumns,
+        });
+      });
+    });
+
     afterNextRender(() => {
       this.perfService.markBootReady();
       this.logsService.info("boot", "Application is ready");
@@ -149,6 +202,7 @@ export class AppComponent implements OnDestroy {
     }
     this.unlistenNativeDropEvents.length = 0;
     this.datasetMetricsService.clear();
+    this.dataAnalysisPluginService.disable();
   }
 
   onFileDropped(filePath: string): Promise<void> {
@@ -259,12 +313,37 @@ export class AppComponent implements OnDestroy {
     this.queryService.appendColumnToQuery(columnName);
   }
 
-  toggleSchemaSidebar(): void {
-    this.layoutState.toggleSchemaSidebar();
+  onAnalysisColumnDropped(payload: { columnName: string; dataType: string | null }): void {
+    const columnName = payload.columnName.trim();
+    if (!columnName) {
+      return;
+    }
+
+    const schemaColumns = this.schemaColumns();
+    const existsInSchema = schemaColumns.some((column) => column.name === columnName);
+    if (!existsInSchema) {
+      return;
+    }
+
+    this.analysisSelectedColumnNames.update((selected) => {
+      if (selected.includes(columnName)) {
+        return selected;
+      }
+
+      return [...selected, columnName];
+    });
+  }
+
+  onAnalysisColumnRemoved(columnName: string): void {
+    this.analysisSelectedColumnNames.update((selected) => selected.filter((entry) => entry !== columnName));
   }
 
   toggleCheatSheet(): void {
     this.layoutState.toggleCheatSheet();
+  }
+
+  toggleAnalysisPanel(): void {
+    this.layoutState.toggleAnalysisPanel();
   }
 
   closeCheatSheet(): void {
@@ -305,5 +384,23 @@ export class AppComponent implements OnDestroy {
       return error.message;
     }
     return "Unknown runtime error";
+  }
+
+  private resolveSelectedAnalysisColumns(columns: ColumnSchema[], selectedColumnNames: string[]): ColumnSchema[] {
+    if (selectedColumnNames.length === 0 || columns.length === 0) {
+      return [];
+    }
+
+    const byName = new Map(columns.map((column) => [column.name, column]));
+    const resolved: ColumnSchema[] = [];
+
+    for (const selectedName of selectedColumnNames) {
+      const column = byName.get(selectedName);
+      if (column) {
+        resolved.push(column);
+      }
+    }
+
+    return resolved;
   }
 }

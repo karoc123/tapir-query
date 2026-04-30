@@ -9,44 +9,23 @@ export type LayoutMode = "empty" | "loaded";
 export class LayoutStateService {
   private readonly fileService = inject(FileService);
 
-  private readonly schemaCollapsedState = signal(true);
   private readonly cheatSheetOpenState = signal(false);
+  private readonly analysisPanelOpenState = signal(false);
 
-  readonly mode = computed<LayoutMode>(() =>
-    this.fileService.currentTable() ? "loaded" : "empty",
-  );
+  readonly mode = computed<LayoutMode>(() => (this.fileService.currentTable() ? "loaded" : "empty"));
   readonly isEmpty = computed(() => this.mode() === "empty");
   readonly isLoaded = computed(() => this.mode() === "loaded");
-  readonly schemaCollapsed = computed(() => this.schemaCollapsedState());
+  readonly schemaCollapsed = computed(() => !this.isLoaded() || !this.analysisPanelOpenState());
   readonly cheatSheetOpen = computed(() => this.cheatSheetOpenState());
+  readonly analysisPanelOpen = computed(() => this.analysisPanelOpenState());
 
   constructor() {
     effect(() => {
       if (!this.isLoaded()) {
-        this.schemaCollapsedState.set(true);
         this.cheatSheetOpenState.set(false);
+        this.analysisPanelOpenState.set(false);
       }
     });
-  }
-
-  toggleSchemaSidebar(): void {
-    if (!this.isLoaded()) {
-      return;
-    }
-
-    this.schemaCollapsedState.update((value) => !value);
-  }
-
-  collapseSchemaSidebar(): void {
-    this.schemaCollapsedState.set(true);
-  }
-
-  expandSchemaSidebar(): void {
-    if (!this.isLoaded()) {
-      return;
-    }
-
-    this.schemaCollapsedState.set(false);
   }
 
   toggleCheatSheet(): void {
@@ -67,5 +46,25 @@ export class LayoutStateService {
 
   closeCheatSheet(): void {
     this.cheatSheetOpenState.set(false);
+  }
+
+  toggleAnalysisPanel(): void {
+    if (!this.isLoaded()) {
+      return;
+    }
+
+    this.analysisPanelOpenState.update((open) => !open);
+  }
+
+  openAnalysisPanel(): void {
+    if (!this.isLoaded()) {
+      return;
+    }
+
+    this.analysisPanelOpenState.set(true);
+  }
+
+  closeAnalysisPanel(): void {
+    this.analysisPanelOpenState.set(false);
   }
 }

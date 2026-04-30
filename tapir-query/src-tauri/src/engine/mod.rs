@@ -46,6 +46,61 @@ pub struct ExportResult {
     pub rows_written: u64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ColumnProfileMetricKind {
+    CardinalityTopValues,
+    CompletenessAudit,
+    StringLengthHistogram,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CardinalityValueCount {
+    pub value: String,
+    pub frequency: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompletenessAudit {
+    pub populated: usize,
+    pub empty_or_null: usize,
+    pub completeness_ratio: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StringLengthBucket {
+    pub label: String,
+    pub min_inclusive: usize,
+    pub max_inclusive: Option<usize>,
+    pub frequency: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StringLengthHistogram {
+    pub non_empty_rows: usize,
+    pub min_length: Option<usize>,
+    pub max_length: Option<usize>,
+    pub average_length: Option<f64>,
+    pub buckets: Vec<StringLengthBucket>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColumnProfileMetric {
+    pub column_name: String,
+    pub metric: ColumnProfileMetricKind,
+    pub elapsed_ms: u64,
+    pub total_rows: usize,
+    pub cardinality_top_values: Option<Vec<CardinalityValueCount>>,
+    pub unique_value_count: Option<usize>,
+    pub completeness: Option<CompletenessAudit>,
+    pub string_length_histogram: Option<StringLengthHistogram>,
+}
+
 pub type EngineResult<T> = Result<T, AppError>;
 
 pub trait CsvQueryEngine: Send + Sync {
@@ -98,4 +153,13 @@ pub trait CsvQueryEngine: Send + Sync {
         sql: &str,
         output_path: &str,
     ) -> EngineResult<ExportResult>;
+
+    fn run_column_profile_metric(
+        &self,
+        registered: &HashMap<String, RegisteredCsv>,
+        sql: &str,
+        column_name: &str,
+        metric: ColumnProfileMetricKind,
+        total_rows_hint: Option<usize>,
+    ) -> EngineResult<ColumnProfileMetric>;
 }

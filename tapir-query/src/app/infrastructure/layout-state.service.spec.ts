@@ -13,6 +13,7 @@ describe("LayoutStateService", () => {
 
     expect(service.mode()).toBe("empty");
     expect(service.schemaCollapsed()).toBe(true);
+    expect(service.analysisPanelOpen()).toBe(false);
 
     fileService.setOpenedFile({
       tableName: "transactions",
@@ -23,6 +24,30 @@ describe("LayoutStateService", () => {
     });
 
     expect(service.mode()).toBe("loaded");
+    expect(service.schemaCollapsed()).toBe(true);
+  });
+
+  it("opens schema only while analyze panel is open", () => {
+    const fileService = TestBed.inject(FileService);
+    const service = TestBed.inject(LayoutStateService);
+
+    fileService.setOpenedFile({
+      tableName: "transactions",
+      filePath: "/tmp/transactions.csv",
+      columns: [{ name: "amount", dataType: "DOUBLE" }],
+      defaultQuery: "SELECT * FROM transactions",
+      fileSizeBytes: 2048,
+    });
+
+    expect(service.schemaCollapsed()).toBe(true);
+
+    service.openAnalysisPanel();
+    expect(service.analysisPanelOpen()).toBe(true);
+    expect(service.schemaCollapsed()).toBe(false);
+
+    service.closeAnalysisPanel();
+    expect(service.analysisPanelOpen()).toBe(false);
+    expect(service.schemaCollapsed()).toBe(true);
   });
 
   it("resets panel states when returning to empty mode", () => {
@@ -37,11 +62,12 @@ describe("LayoutStateService", () => {
       fileSizeBytes: 2048,
     });
 
-    service.toggleSchemaSidebar();
     service.openCheatSheet();
+    service.openAnalysisPanel();
 
     expect(service.schemaCollapsed()).toBe(false);
     expect(service.cheatSheetOpen()).toBe(true);
+    expect(service.analysisPanelOpen()).toBe(true);
 
     fileService.clear();
     TestBed.flushEffects();
@@ -49,5 +75,6 @@ describe("LayoutStateService", () => {
     expect(service.mode()).toBe("empty");
     expect(service.schemaCollapsed()).toBe(true);
     expect(service.cheatSheetOpen()).toBe(false);
+    expect(service.analysisPanelOpen()).toBe(false);
   });
 });

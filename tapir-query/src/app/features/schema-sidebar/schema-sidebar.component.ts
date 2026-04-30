@@ -20,4 +20,16 @@ export class SchemaSidebarComponent {
   selectColumn(columnName: string): void {
     this.columnSelected.emit(columnName);
   }
+
+  onColumnDragStart(event: DragEvent, column: ColumnSchema): void {
+    const transfer = event.dataTransfer;
+    if (!transfer) {
+      return;
+    }
+
+    transfer.effectAllowed = "copy";
+    transfer.setData("application/x-tapir-column-name", column.name);
+    transfer.setData("application/x-tapir-column-type", column.dataType);
+    transfer.setData("text/plain", column.name);
+  }
 }

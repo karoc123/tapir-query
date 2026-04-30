@@ -37,6 +37,7 @@ cd tapir-query && pnpm tauri:dev
 - Local-first data processing through embedded DuckDB.
 - Typed IPC contracts between Rust commands and Angular services.
 - Query execution in predictable chunks for stable memory usage.
+- On-demand data analysis plugin with exact per-column profiling and split-view workflow.
 - Context-first UI that starts in a single empty-state ingestion surface.
 - Built-in observability for logs and runtime timing telemetry.
 

@@ -72,10 +72,15 @@
   padding: 0.45rem 0.55rem;
   text-align: left;
   transition: background 130ms ease;
+  cursor: grab;
 }
 
 .column-item:hover {
   background: color-mix(in srgb, var(--tapir-accent) 10%, var(--tapir-surface));
+}
+
+.column-item:active {
+  cursor: grabbing;
 }
 
 .column-name {

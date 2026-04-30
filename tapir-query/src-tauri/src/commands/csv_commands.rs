@@ -33,6 +33,15 @@ pub struct ExecuteQueryRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct RunColumnProfileMetricRequest {
+    pub sql: String,
+    pub column_name: String,
+    pub metric: crate::engine::ColumnProfileMetricKind,
+    pub total_rows_hint: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StartQuerySessionRequest {
     pub sql: String,
 }
@@ -158,6 +167,45 @@ pub async fn execute_query(
     );
 
     Ok(chunk)
+}
+
+#[tauri::command]
+pub async fn run_column_profile_metric(
+    request: RunColumnProfileMetricRequest,
+    state: State<'_, AppState>,
+) -> Result<crate::engine::ColumnProfileMetric, String> {
+    info!(
+        "run_column_profile_metric request received column={} metric={:?} sql_len={} total_rows_hint={:?}",
+        request.column_name,
+        request.metric,
+        request.sql.len(),
+        request.total_rows_hint
+    );
+
+    let csv_service = state.csv_service.clone();
+    let sql = request.sql;
+    let column_name = request.column_name;
+    let metric = request.metric;
+    let total_rows_hint = request.total_rows_hint;
+
+    info!(
+        "run_column_profile_metric task dispatched column={} metric={:?}",
+        column_name, metric
+    );
+
+    let profile = async_runtime::spawn_blocking(move || {
+        csv_service.run_column_profile_metric(&sql, &column_name, metric, total_rows_hint)
+    })
+    .await
+    .map_err(|error| map_join_error("run_column_profile_metric", error))?
+    .map_err(map_error)?;
+
+    info!(
+        "run_column_profile_metric success column={} metric={:?} elapsed_ms={}",
+        profile.column_name, profile.metric, profile.elapsed_ms
+    );
+
+    Ok(profile)
 }
 
 #[tauri::command]

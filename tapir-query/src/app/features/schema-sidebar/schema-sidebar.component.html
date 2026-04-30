@@ -14,12 +14,7 @@
       <ul class="column-list">
         @for (column of columns(); track column.name) {
           <li>
-            <button
-              type="button"
-              class="column-item"
-              [title]="'Insert ' + column.name"
-              (click)="selectColumn(column.name)"
-            >
+            <button type="button" class="column-item" [title]="'Insert ' + column.name" draggable="true" (dragstart)="onColumnDragStart($event, column)" (click)="selectColumn(column.name)">
               <span class="column-name">{{ column.name }}</span>
               <span class="column-type">{{ column.dataType }}</span>
             </button>

@@ -1,6 +1,7 @@
 use crate::engine::sql_builder;
 use crate::engine::{
-    ColumnSchema, CsvQueryEngine, ExportResult, QueryChunk, QuerySession, RegisteredCsv,
+    ColumnProfileMetric, ColumnProfileMetricKind, ColumnSchema, CsvQueryEngine, ExportResult,
+    QueryChunk, QuerySession, RegisteredCsv,
 };
 use crate::error::{AppError, AppResult};
 use std::collections::HashMap;
@@ -119,6 +120,22 @@ impl CsvQueryService {
             registry.len()
         );
         self.engine.export_query_to_csv(&registry, sql, output_path)
+    }
+
+    pub fn run_column_profile_metric(
+        &self,
+        sql: &str,
+        column_name: &str,
+        metric: ColumnProfileMetricKind,
+        total_rows_hint: Option<usize>,
+    ) -> AppResult<ColumnProfileMetric> {
+        let registry = self.snapshot_registry()?;
+        debug!(
+            "csv_query_service run_column_profile_metric column={} metric={:?} total_rows_hint={:?}",
+            column_name, metric, total_rows_hint
+        );
+        self.engine
+            .run_column_profile_metric(&registry, sql, column_name, metric, total_rows_hint)
     }
 
     fn snapshot_registry(&self) -> AppResult<HashMap<String, RegisteredCsv>> {

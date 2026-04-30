@@ -1,6 +1,7 @@
 import { Injectable } from "@angular/core";
 import { invoke } from "@tauri-apps/api/core";
 import {
+  ColumnProfileMetricResult,
   CloseQuerySessionRequest,
   CloseQuerySessionResponse,
   ExecuteQueryRequest,
@@ -11,6 +12,7 @@ import {
   QuerySessionResponse,
   QueryChunk,
   ReadQuerySessionChunkRequest,
+  RunColumnProfileMetricRequest,
   StartQuerySessionRequest,
 } from "./tauri-contracts";
 import { LogService } from "./log.service";
@@ -33,6 +35,12 @@ export class TauriBridgeService {
 
   executeQuery(payload: ExecuteQueryRequest): Promise<QueryChunk> {
     return this.invokeWithLogging<QueryChunk>("execute_query", {
+      request: payload,
+    });
+  }
+
+  runColumnProfileMetric(payload: RunColumnProfileMetricRequest): Promise<ColumnProfileMetricResult> {
+    return this.invokeWithLogging<ColumnProfileMetricResult>("run_column_profile_metric", {
       request: payload,
     });
   }
@@ -67,10 +75,7 @@ export class TauriBridgeService {
     });
   }
 
-  private async invokeWithLogging<T>(
-    command: string,
-    payload?: Record<string, unknown>,
-  ): Promise<T> {
+  private async invokeWithLogging<T>(command: string, payload?: Record<string, unknown>): Promise<T> {
     const timerKey = `ipc:${command}`;
     this.perf.start(timerKey);
     this.logs.info("ipc", `Invoking ${command}`, payload);

@@ -19,6 +19,52 @@ export interface ExecuteQueryRequest {
   offset?: number;
 }
 
+export type ColumnProfileMetricKind = "cardinalityTopValues" | "completenessAudit" | "stringLengthHistogram";
+
+export interface RunColumnProfileMetricRequest {
+  sql: string;
+  columnName: string;
+  metric: ColumnProfileMetricKind;
+  totalRowsHint?: number | null;
+}
+
+export interface CardinalityTopValue {
+  value: string;
+  frequency: number;
+}
+
+export interface CompletenessAudit {
+  populated: number;
+  emptyOrNull: number;
+  completenessRatio: number;
+}
+
+export interface StringLengthBucket {
+  label: string;
+  minInclusive: number;
+  maxInclusive: number | null;
+  frequency: number;
+}
+
+export interface StringLengthHistogram {
+  nonEmptyRows: number;
+  minLength: number | null;
+  maxLength: number | null;
+  averageLength: number | null;
+  buckets: StringLengthBucket[];
+}
+
+export interface ColumnProfileMetricResult {
+  columnName: string;
+  metric: ColumnProfileMetricKind;
+  elapsedMs: number;
+  totalRows: number;
+  cardinalityTopValues: CardinalityTopValue[] | null;
+  uniqueValueCount: number | null;
+  completeness: CompletenessAudit | null;
+  stringLengthHistogram: StringLengthHistogram | null;
+}
+
 export interface StartQuerySessionRequest {
   sql: string;
 }

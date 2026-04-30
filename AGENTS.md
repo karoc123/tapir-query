@@ -26,6 +26,7 @@ This file is the operating guide for coding agents working in this repository.
 5. Validate immediately with focused commands.
 6. Update docs when architecture, contracts, or workflows change.
 7. Summarize what changed, what passed, and remaining risks.
+8. ASK QUESTIONS EARLY if any uncertainty about scope, approach, or architecture. You are running inside VS Code with full access to the codebase and documentation.
 
 ## Repository Facts
 

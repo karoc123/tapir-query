@@ -77,6 +77,13 @@ pub fn build_count_sql(sql: &str) -> String {
     format!("SELECT COUNT(*) FROM ({sql}) AS tapir_result")
 }
 
+pub fn build_column_value_scope_sql(sql: &str, column_name: &str) -> String {
+    let quoted_column = quote_identifier(column_name);
+    format!(
+        "SELECT CAST({quoted_column} AS VARCHAR) AS tapir_value FROM ({sql}) AS tapir_result"
+    )
+}
+
 pub fn build_export_csv_sql(sql: &str, output_path: &str) -> String {
     format!(
         "COPY ({sql}) TO '{}' (FORMAT CSV, HEADER, DELIMITER ',');",
@@ -116,6 +123,19 @@ mod tests {
         assert!(sql.contains("CAST(\"booking_date\" AS VARCHAR) AS \"booking_date\""));
         assert!(sql.contains("CAST(\"customer id\" AS VARCHAR) AS \"customer id\""));
         assert!(sql.contains("LIMIT 200 OFFSET 0"));
+    }
+
+    #[test]
+    fn builds_column_value_scope_sql() {
+        let sql = build_column_value_scope_sql(
+            "SELECT customer_id FROM transactions",
+            "customer_id",
+        );
+
+        assert_eq!(
+            sql,
+            "SELECT CAST(\"customer_id\" AS VARCHAR) AS tapir_value FROM (SELECT customer_id FROM transactions) AS tapir_result"
+        );
     }
 
 }

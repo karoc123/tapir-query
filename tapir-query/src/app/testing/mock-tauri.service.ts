@@ -1,4 +1,5 @@
 import {
+  ColumnProfileMetricResult,
   CloseQuerySessionRequest,
   CloseQuerySessionResponse,
   ExecuteQueryRequest,
@@ -9,6 +10,7 @@ import {
   QuerySessionResponse,
   QueryChunk,
   ReadQuerySessionChunkRequest,
+  RunColumnProfileMetricRequest,
   StartQuerySessionRequest,
 } from "../infrastructure/tauri-contracts";
 
@@ -21,6 +23,8 @@ export class MockTauriService {
   closeQuerySessionCalls: CloseQuerySessionRequest[] = [];
   exportCsvCalls: ExportCsvRequest[] = [];
   exportRowsCalls: ExportRowsRequest[] = [];
+  runColumnProfileMetricCalls: RunColumnProfileMetricRequest[] = [];
+  runColumnProfileMetricResults: ColumnProfileMetricResult[] = [];
 
   openFileResult: OpenFileResponse = {
     tableName: "transactions",
@@ -57,6 +61,23 @@ export class MockTauriService {
     outputPath: "exports/query-results.csv",
     rowsWritten: 1,
   };
+
+  runColumnProfileMetricResult: ColumnProfileMetricResult = {
+    columnName: "currency",
+    metric: "completenessAudit",
+    elapsedMs: 4,
+    totalRows: 1,
+    cardinalityTopValues: null,
+    uniqueValueCount: null,
+    completeness: {
+      populated: 1,
+      emptyOrNull: 0,
+      completenessRatio: 1,
+    },
+    stringLengthHistogram: null,
+  };
+
+  runColumnProfileMetricImpl: ((payload: RunColumnProfileMetricRequest) => Promise<ColumnProfileMetricResult>) | null = null;
 
   async openFile(filePath: string): Promise<OpenFileResponse> {
     this.openFileCalls.push(filePath);
@@ -98,6 +119,21 @@ export class MockTauriService {
     return this.exportResult;
   }
 
+  async runColumnProfileMetric(payload: RunColumnProfileMetricRequest): Promise<ColumnProfileMetricResult> {
+    this.runColumnProfileMetricCalls.push(payload);
+
+    if (this.runColumnProfileMetricImpl !== null) {
+      return await this.runColumnProfileMetricImpl(payload);
+    }
+
+    const nextResult = this.runColumnProfileMetricResults.shift();
+    if (nextResult) {
+      return nextResult;
+    }
+
+    return this.runColumnProfileMetricResult;
+  }
+
   reset(): void {
     this.openFileCalls = [];
     this.executeQueryCalls = [];
@@ -107,5 +143,8 @@ export class MockTauriService {
     this.closeQuerySessionCalls = [];
     this.exportCsvCalls = [];
     this.exportRowsCalls = [];
+    this.runColumnProfileMetricCalls = [];
+    this.runColumnProfileMetricResults = [];
+    this.runColumnProfileMetricImpl = null;
   }
 }

@@ -1,7 +1,8 @@
 use crate::engine::sql_builder;
 use crate::engine::{
-    ColumnSchema, CsvQueryEngine, EngineResult, ExportResult, QueryChunk, QuerySession,
-    RegisteredCsv,
+    CardinalityValueCount, ColumnProfileMetric, ColumnProfileMetricKind, ColumnSchema,
+    CompletenessAudit, CsvQueryEngine, EngineResult, ExportResult, QueryChunk, QuerySession,
+    RegisteredCsv, StringLengthBucket, StringLengthHistogram,
 };
 use crate::error::AppError;
 use duckdb::Connection;
@@ -19,6 +20,21 @@ struct QuerySessionState {
     columns: Vec<String>,
     total_rows: usize,
 }
+
+const NULL_SENTINEL: &str = "__tapir_null__";
+const EMPTY_SENTINEL: &str = "__tapir_empty__";
+const NULL_LABEL: &str = "<NULL>";
+const EMPTY_LABEL: &str = "<EMPTY>";
+
+const LENGTH_BUCKETS: [(&str, usize, Option<usize>); 7] = [
+    ("1-4", 1, Some(4)),
+    ("5-8", 5, Some(8)),
+    ("9-16", 9, Some(16)),
+    ("17-32", 17, Some(32)),
+    ("33-64", 33, Some(64)),
+    ("65-128", 65, Some(128)),
+    ("129+", 129, None),
+];
 
 pub struct DuckDbEngine {
     session_counter: AtomicU64,
@@ -170,6 +186,217 @@ impl DuckDbEngine {
         }
 
         Ok(columns)
+    }
+
+    fn normalize_sql(&self, sql: &str) -> String {
+        sql.trim().trim_end_matches(';').trim().to_string()
+    }
+
+    fn count_total_rows(&self, connection: &Connection, sql: &str) -> EngineResult<usize> {
+        let count_sql = sql_builder::build_count_sql(sql);
+        let total_rows: i64 = connection
+            .query_row(&count_sql, [], |row| row.get(0))
+            .map_err(|error| AppError::Sql(format!("failed to count profile rows: {error}")))?;
+
+        Ok(total_rows.max(0) as usize)
+    }
+
+    fn query_cardinality_metric(
+        &self,
+        connection: &Connection,
+        sql: &str,
+        column_name: &str,
+    ) -> EngineResult<(usize, Vec<CardinalityValueCount>)> {
+        let value_scope_sql = sql_builder::build_column_value_scope_sql(sql, column_name);
+        let normalized_expression = format!(
+            "CASE WHEN tapir_value IS NULL THEN '{}' WHEN LENGTH(TRIM(tapir_value)) = 0 THEN '{}' ELSE tapir_value END",
+            NULL_SENTINEL, EMPTY_SENTINEL
+        );
+
+        let top_values_sql = format!(
+            "WITH normalized AS (SELECT {normalized_expression} AS normalized_value FROM ({value_scope_sql}) AS tapir_values), \
+                  grouped AS (\
+                      SELECT normalized_value, COUNT(*) AS frequency \
+                      FROM normalized \
+                      GROUP BY normalized_value\
+                  ), \
+                  ranked AS (\
+                      SELECT normalized_value, frequency, COUNT(*) OVER() AS unique_count \
+                      FROM grouped \
+                      ORDER BY frequency DESC, normalized_value ASC \
+                      LIMIT 10\
+                  ) \
+             SELECT normalized_value, frequency, unique_count FROM ranked"
+        );
+
+        let mut statement = connection
+            .prepare(&top_values_sql)
+            .map_err(|error| AppError::Sql(format!("failed to prepare top-value query: {error}")))?;
+        let mut cursor = statement
+            .query([])
+            .map_err(|error| AppError::Sql(format!("failed to execute top-value query: {error}")))?;
+
+        let mut top_values = Vec::new();
+        let mut unique_value_count: Option<usize> = None;
+        while let Some(row) = cursor
+            .next()
+            .map_err(|error| AppError::Sql(format!("failed to iterate top-value rows: {error}")))?
+        {
+            let raw_value: String = row
+                .get(0)
+                .map_err(|error| AppError::Sql(format!("failed to read top-value label: {error}")))?;
+            let frequency: i64 = row
+                .get(1)
+                .map_err(|error| AppError::Sql(format!("failed to read top-value frequency: {error}")))?;
+            let unique_count: i64 = row
+                .get(2)
+                .map_err(|error| AppError::Sql(format!("failed to read unique value count: {error}")))?;
+
+            if unique_value_count.is_none() {
+                unique_value_count = Some(unique_count.max(0) as usize);
+            }
+
+            let value = match raw_value.as_str() {
+                NULL_SENTINEL => String::from(NULL_LABEL),
+                EMPTY_SENTINEL => String::from(EMPTY_LABEL),
+                _ => raw_value,
+            };
+
+            top_values.push(CardinalityValueCount {
+                value,
+                frequency: frequency.max(0) as usize,
+            });
+        }
+
+        Ok((unique_value_count.unwrap_or(0), top_values))
+    }
+
+    fn query_completeness_metric(
+        &self,
+        connection: &Connection,
+        sql: &str,
+        column_name: &str,
+    ) -> EngineResult<(CompletenessAudit, usize)> {
+        let value_scope_sql = sql_builder::build_column_value_scope_sql(sql, column_name);
+        let completeness_sql = format!(
+            "SELECT \
+                SUM(CASE WHEN tapir_value IS NULL OR LENGTH(TRIM(tapir_value)) = 0 THEN 0 ELSE 1 END) AS populated, \
+                SUM(CASE WHEN tapir_value IS NULL OR LENGTH(TRIM(tapir_value)) = 0 THEN 1 ELSE 0 END) AS empty_or_null, \
+                COUNT(*) AS total_rows \
+             FROM ({value_scope_sql}) AS tapir_values"
+        );
+
+        let (populated, empty_or_null, total_rows): (i64, i64, i64) = connection
+            .query_row(&completeness_sql, [], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+            })
+            .map_err(|error| AppError::Sql(format!("failed to compute completeness audit: {error}")))?;
+
+        let total_rows = total_rows.max(0) as usize;
+        let populated = populated.max(0) as usize;
+        let empty_or_null = empty_or_null.max(0) as usize;
+        let completeness_ratio = if total_rows == 0 {
+            0.0
+        } else {
+            ((populated as f64 / total_rows as f64) * 1_000_000.0).round() / 1_000_000.0
+        };
+
+        Ok((
+            CompletenessAudit {
+                populated,
+                empty_or_null,
+                completeness_ratio,
+            },
+            total_rows,
+        ))
+    }
+
+    fn query_string_length_histogram(
+        &self,
+        connection: &Connection,
+        sql: &str,
+        column_name: &str,
+    ) -> EngineResult<StringLengthHistogram> {
+        let value_scope_sql = sql_builder::build_column_value_scope_sql(sql, column_name);
+        let lengths_cte = format!(
+            "WITH lengths AS (\
+                SELECT LENGTH(TRIM(tapir_value)) AS tapir_length \
+                FROM ({value_scope_sql}) AS tapir_values \
+                WHERE tapir_value IS NOT NULL AND LENGTH(TRIM(tapir_value)) > 0\
+            )"
+        );
+
+        let stats_sql = format!(
+            "{lengths_cte} \
+             SELECT COUNT(*) AS non_empty_rows, MIN(tapir_length), MAX(tapir_length), AVG(tapir_length) \
+             FROM lengths"
+        );
+
+        let (non_empty_rows, min_length, max_length, average_length): (i64, Option<i64>, Option<i64>, Option<f64>) = connection
+            .query_row(&stats_sql, [], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })
+            .map_err(|error| AppError::Sql(format!("failed to compute length stats: {error}")))?;
+
+        let bucket_sql = format!(
+            "{lengths_cte} \
+             SELECT \
+                CASE \
+                    WHEN tapir_length BETWEEN 1 AND 4 THEN 1 \
+                    WHEN tapir_length BETWEEN 5 AND 8 THEN 2 \
+                    WHEN tapir_length BETWEEN 9 AND 16 THEN 3 \
+                    WHEN tapir_length BETWEEN 17 AND 32 THEN 4 \
+                    WHEN tapir_length BETWEEN 33 AND 64 THEN 5 \
+                    WHEN tapir_length BETWEEN 65 AND 128 THEN 6 \
+                    ELSE 7 \
+                END AS bucket_order, \
+                COUNT(*) AS frequency \
+             FROM lengths \
+             GROUP BY bucket_order \
+             ORDER BY bucket_order ASC"
+        );
+
+        let mut statement = connection
+            .prepare(&bucket_sql)
+            .map_err(|error| AppError::Sql(format!("failed to prepare length bucket query: {error}")))?;
+        let mut cursor = statement
+            .query([])
+            .map_err(|error| AppError::Sql(format!("failed to execute length bucket query: {error}")))?;
+
+        let mut frequencies_by_order = HashMap::<i64, usize>::new();
+        while let Some(row) = cursor
+            .next()
+            .map_err(|error| AppError::Sql(format!("failed to iterate length buckets: {error}")))?
+        {
+            let order: i64 = row
+                .get(0)
+                .map_err(|error| AppError::Sql(format!("failed to read bucket order: {error}")))?;
+            let frequency: i64 = row
+                .get(1)
+                .map_err(|error| AppError::Sql(format!("failed to read bucket frequency: {error}")))?;
+            frequencies_by_order.insert(order, frequency.max(0) as usize);
+        }
+
+        let buckets = LENGTH_BUCKETS
+            .iter()
+            .enumerate()
+            .map(|(index, (label, min_inclusive, max_inclusive))| StringLengthBucket {
+                label: String::from(*label),
+                min_inclusive: *min_inclusive,
+                max_inclusive: *max_inclusive,
+                frequency: *frequencies_by_order
+                    .get(&((index + 1) as i64))
+                    .unwrap_or(&0),
+            })
+            .collect::<Vec<_>>();
+
+        Ok(StringLengthHistogram {
+            non_empty_rows: non_empty_rows.max(0) as usize,
+            min_length: min_length.map(|value| value.max(0) as usize),
+            max_length: max_length.map(|value| value.max(0) as usize),
+            average_length: average_length.map(|value| (value * 100.0).round() / 100.0),
+            buckets,
+        })
     }
 
 }
@@ -479,6 +706,87 @@ impl CsvQueryEngine for DuckDbEngine {
             })
         })
     }
+
+    fn run_column_profile_metric(
+        &self,
+        registered: &HashMap<String, RegisteredCsv>,
+        sql: &str,
+        column_name: &str,
+        metric: ColumnProfileMetricKind,
+        total_rows_hint: Option<usize>,
+    ) -> EngineResult<ColumnProfileMetric> {
+        self.validate_registered_files(registered)?;
+
+        let normalized_sql = self.normalize_sql(sql);
+        if normalized_sql.is_empty() {
+            return Err(AppError::Validation(String::from(
+                "query cannot be empty for profiling",
+            )));
+        }
+
+        let normalized_column = column_name.trim();
+        if normalized_column.is_empty() {
+            return Err(AppError::Validation(String::from(
+                "column name cannot be empty for profiling",
+            )));
+        }
+
+        self.with_connection(registered, |connection| {
+            let started = Instant::now();
+
+            // Profiling runs in background and may overlap with interactive query commands.
+            // Keep a conservative DuckDB thread count per profiling task to reduce contention.
+            connection
+                .execute_batch("PRAGMA threads=1;")
+                .map_err(|error| AppError::Sql(format!("failed to set profiling thread limit: {error}")))?;
+
+            let mut resolved_total_rows = total_rows_hint.unwrap_or(0);
+
+            let mut result = ColumnProfileMetric {
+                column_name: normalized_column.to_string(),
+                metric: metric.clone(),
+                elapsed_ms: 0,
+                total_rows: 0,
+                cardinality_top_values: None,
+                unique_value_count: None,
+                completeness: None,
+                string_length_histogram: None,
+            };
+
+            match metric {
+                ColumnProfileMetricKind::CardinalityTopValues => {
+                    if resolved_total_rows == 0 {
+                        resolved_total_rows = self.count_total_rows(connection, &normalized_sql)?;
+                    }
+                    let (unique_value_count, top_values) =
+                        self.query_cardinality_metric(connection, &normalized_sql, normalized_column)?;
+                    result.unique_value_count = Some(unique_value_count);
+                    result.cardinality_top_values = Some(top_values);
+                }
+                ColumnProfileMetricKind::CompletenessAudit => {
+                    let (completeness, total_rows) =
+                        self.query_completeness_metric(connection, &normalized_sql, normalized_column)?;
+                    resolved_total_rows = total_rows;
+                    result.completeness = Some(completeness);
+                }
+                ColumnProfileMetricKind::StringLengthHistogram => {
+                    if resolved_total_rows == 0 {
+                        resolved_total_rows = self.count_total_rows(connection, &normalized_sql)?;
+                    }
+                    let histogram = self.query_string_length_histogram(
+                        connection,
+                        &normalized_sql,
+                        normalized_column,
+                    )?;
+                    result.string_length_histogram = Some(histogram);
+                }
+            }
+
+            result.total_rows = resolved_total_rows;
+            result.elapsed_ms = started.elapsed().as_millis() as u64;
+            Ok(result)
+        })
+    }
 }
 
 #[cfg(test)]
@@ -717,6 +1025,109 @@ mod tests {
             .expect("read query session chunk");
 
         assert_eq!(chunk.rows.len(), 2);
+        let _ = std::fs::remove_file(csv_path);
+    }
+
+    #[test]
+    fn run_column_profile_metric_returns_exact_cardinality_and_completeness() {
+        let csv_path = make_temp_csv("partner,iban\nACME,DE123\nACME,DE123\nBETA,DE999\n,DE999\n   ,\n");
+        let engine = DuckDbEngine::new(1);
+        let mut registered = HashMap::new();
+
+        let table = engine
+            .register_csv(&registered, csv_path.to_string_lossy().as_ref())
+            .expect("register CSV");
+        registered.insert(table.table_name.clone(), table.clone());
+
+        let sql = format!(
+            "SELECT partner, iban FROM {}",
+            sql_builder::quote_identifier(&table.table_name)
+        );
+
+        let cardinality = engine
+            .run_column_profile_metric(
+                &registered,
+                &sql,
+                "partner",
+                ColumnProfileMetricKind::CardinalityTopValues,
+                None,
+            )
+            .expect("run cardinality metric");
+
+        assert_eq!(cardinality.total_rows, 5);
+        assert_eq!(cardinality.unique_value_count, Some(4));
+        let top_values = cardinality
+            .cardinality_top_values
+            .expect("cardinality payload");
+        assert!(top_values.iter().any(|entry| {
+            entry.value == "ACME" && entry.frequency == 2
+        }));
+        let empty_frequency = top_values
+            .iter()
+            .filter(|entry| entry.value == "<EMPTY>" || entry.value == "<NULL>")
+            .map(|entry| entry.frequency)
+            .sum::<usize>();
+        assert_eq!(empty_frequency, 2);
+
+        let completeness = engine
+            .run_column_profile_metric(
+                &registered,
+                &sql,
+                "partner",
+                ColumnProfileMetricKind::CompletenessAudit,
+                None,
+            )
+            .expect("run completeness metric");
+
+        let audit = completeness.completeness.expect("completeness payload");
+        assert_eq!(completeness.total_rows, 5);
+        assert_eq!(audit.populated, 3);
+        assert_eq!(audit.empty_or_null, 2);
+        assert!((audit.completeness_ratio - 0.6).abs() < f64::EPSILON);
+
+        let _ = std::fs::remove_file(csv_path);
+    }
+
+    #[test]
+    fn run_column_profile_metric_returns_exact_string_length_histogram() {
+        let csv_path = make_temp_csv("partner,iban\nACME,DE123\nACME,DE123\nBETA,DE999\n,DE999\n   ,\n");
+        let engine = DuckDbEngine::new(1);
+        let mut registered = HashMap::new();
+
+        let table = engine
+            .register_csv(&registered, csv_path.to_string_lossy().as_ref())
+            .expect("register CSV");
+        registered.insert(table.table_name.clone(), table.clone());
+
+        let sql = format!(
+            "SELECT partner, iban FROM {}",
+            sql_builder::quote_identifier(&table.table_name)
+        );
+
+        let histogram = engine
+            .run_column_profile_metric(
+                &registered,
+                &sql,
+                "iban",
+                ColumnProfileMetricKind::StringLengthHistogram,
+                None,
+            )
+            .expect("run length histogram metric")
+            .string_length_histogram
+            .expect("histogram payload");
+
+        assert_eq!(histogram.non_empty_rows, 4);
+        assert_eq!(histogram.min_length, Some(5));
+        assert_eq!(histogram.max_length, Some(5));
+        assert_eq!(histogram.average_length, Some(5.0));
+
+        let bucket_5_to_8 = histogram
+            .buckets
+            .iter()
+            .find(|bucket| bucket.label == "5-8")
+            .expect("5-8 bucket present");
+        assert_eq!(bucket_5_to_8.frequency, 4);
+
         let _ = std::fs::remove_file(csv_path);
     }
 }
