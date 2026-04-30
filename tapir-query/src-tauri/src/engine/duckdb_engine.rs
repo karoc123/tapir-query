@@ -24,6 +24,7 @@ pub struct DuckDbEngine {
     pool: DuckDbPool,
     session_counter: AtomicU64,
     sessions: Mutex<HashMap<String, QuerySessionState>>,
+    registered_views: Mutex<HashMap<String, String>>,
 }
 
 impl Default for DuckDbEngine {
@@ -40,6 +41,7 @@ impl DuckDbEngine {
             pool: DuckDbPool::new(pool_size.max(1)),
             session_counter: AtomicU64::new(1),
             sessions: Mutex::new(HashMap::new()),
+            registered_views: Mutex::new(HashMap::new()),
         }
     }
 
@@ -100,7 +102,37 @@ impl DuckDbEngine {
 
         debug!("acquired pooled DuckDB connection");
 
+        let mut registered_views = self
+            .registered_views
+            .lock()
+            .map_err(|_| AppError::State(String::from("failed to lock registered views cache")))?;
+
+        let stale_tables = registered_views
+            .keys()
+            .filter(|table_name| !registered.contains_key(*table_name))
+            .cloned()
+            .collect::<Vec<_>>();
+
+        for table_name in &stale_tables {
+            let drop_sql = sql_builder::build_drop_view_sql(table_name);
+            connection.execute_batch(&drop_sql).map_err(|error| {
+                AppError::Sql(format!(
+                    "failed to remove stale CSV view {}: {error}",
+                    table_name
+                ))
+            })?;
+            registered_views.remove(table_name);
+        }
+
         for table in registered.values() {
+            let already_registered = registered_views
+                .get(&table.table_name)
+                .is_some_and(|path| path == &table.file_path);
+
+            if already_registered {
+                continue;
+            }
+
             let register_sql =
                 sql_builder::build_register_view_sql(&table.table_name, &table.file_path);
             connection.execute_batch(&register_sql).map_err(|error| {
@@ -113,6 +145,8 @@ impl DuckDbEngine {
                     table.table_name
                 ))
             })?;
+
+            registered_views.insert(table.table_name.clone(), table.file_path.clone());
         }
 
         operation(connection)

@@ -11,7 +11,7 @@ use tracing_subscriber::EnvFilter;
 static TRACING_INIT: Once = Once::new();
 
 pub struct AppState {
-    pub csv_service: CsvQueryService,
+    pub csv_service: Arc<CsvQueryService>,
 }
 
 impl Default for AppState {
@@ -19,7 +19,7 @@ impl Default for AppState {
         let engine = Arc::new(DuckDbEngine::default());
 
         Self {
-            csv_service: CsvQueryService::new(engine),
+            csv_service: Arc::new(CsvQueryService::new(engine)),
         }
     }
 }

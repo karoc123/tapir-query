@@ -6,7 +6,9 @@
   border-radius: 0.75rem;
   background: var(--tapir-surface-alt);
   color: var(--tapir-text-primary);
-  overflow: hidden;
+  position: relative;
+  overflow: visible;
+  z-index: 1;
   transition:
     border-color 120ms ease,
     box-shadow 120ms ease;
@@ -16,6 +18,7 @@
   outline: none;
   border-color: var(--tapir-accent-strong);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--tapir-accent) 20%, transparent);
+  z-index: 30;
 }
 
 .sql-input[aria-disabled="true"] {
@@ -23,6 +26,7 @@
 }
 
 :host ::ng-deep .sql-input .cm-editor {
+  position: relative;
   background: transparent;
 }
 
@@ -50,4 +54,8 @@
 
 :host ::ng-deep .sql-input .cm-tooltip-autocomplete ul {
   max-height: 12rem;
+}
+
+:host ::ng-deep .sql-input .cm-tooltip {
+  z-index: 999;
 }

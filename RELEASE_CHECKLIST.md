@@ -5,6 +5,7 @@ Use this checklist before running the manual GitHub release workflow.
 ## 1. Bump Version
 
 - Decide release version (example: `1.0.0`).
+- Ensure version matches release workflow validation (`x.y.z` with optional prerelease/build suffix).
 - Confirm the same version will be used for:
   - `tapir-query/package.json`
   - `tapir-query/src-tauri/tauri.conf.json`
@@ -46,8 +47,8 @@ pnpm tauri build
 ## 5. Verify Binaries
 
 - Confirm all expected artifacts are attached to the draft release:
-  - Windows: `.msi`, `.exe` (NSIS)
-  - Linux: `.deb`, `.AppImage`
+  - Windows: `.exe` (NSIS)
+  - Linux: `.deb`
 - Validate draft release title/tag/version alignment.
 - Sanity-install at least one Linux package locally when possible.
 - Publish release only after verification completes.

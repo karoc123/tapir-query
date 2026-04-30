@@ -59,8 +59,8 @@ export class AppComponent implements OnDestroy {
   readonly showSlowLoadHint = this.queryService.showSlowLoadHint;
   readonly activeSortColumn = this.queryService.activeSortColumn;
   readonly activeSortDirection = this.queryService.activeSortDirection;
+  readonly logEntries = this.logsService.entries;
 
-  readonly mode = this.layoutState.mode;
   readonly isEmptyLayout = this.layoutState.isEmpty;
   readonly isLoadedLayout = this.layoutState.isLoaded;
   readonly schemaCollapsed = this.layoutState.schemaCollapsed;
@@ -71,13 +71,7 @@ export class AppComponent implements OnDestroy {
   readonly themeOptions = this.themeService.options;
   readonly defaultExportPath = "exports/query-results.csv";
 
-  readonly activeThemeLabel = computed(() =>
-    this.activeTheme() === "soft-tapir" ? "Soft Tapir" : "Dark Banking",
-  );
-
-  readonly rowStatusLabel = computed(() =>
-    `${this.visibleRowCount().toLocaleString()} rows`,
-  );
+  readonly rowStatusLabel = computed(() => `${this.visibleRowCount().toLocaleString()} rows`);
 
   readonly queryElapsedLabel = computed(() => {
     const elapsed = this.lastQueryElapsedMs();
@@ -88,8 +82,13 @@ export class AppComponent implements OnDestroy {
     return `${elapsed.toFixed(1)} ms`;
   });
 
-  readonly schemaToggleLabel = computed(() =>
-    this.schemaCollapsed() ? "Show Columns" : "Hide Columns",
+  readonly schemaToggleLabel = computed(() => (this.schemaCollapsed() ? "Show Columns" : "Hide Columns"));
+
+  readonly loadingActivityEntries = computed(() =>
+    this.logEntries()
+      .filter((entry) => entry.source !== "signals")
+      .slice(-6)
+      .reverse(),
   );
 
   constructor() {
@@ -141,10 +140,12 @@ export class AppComponent implements OnDestroy {
       const { save } = await import("@tauri-apps/plugin-dialog");
       const outputPath = await save({
         defaultPath: this.defaultExportPath,
-        filters: [{
-          name: "CSV",
-          extensions: ["csv"],
-        }],
+        filters: [
+          {
+            name: "CSV",
+            extensions: ["csv"],
+          },
+        ],
       });
 
       if (!outputPath) {
@@ -156,9 +157,7 @@ export class AppComponent implements OnDestroy {
       this.logsService.error("export", "Unable to open export save dialog", {
         error: this.extractError(error),
       });
-      this.queryService.reportError(
-        "Unable to open export picker. Verify desktop runtime and dialog permissions.",
-      );
+      this.queryService.reportError("Unable to open export picker. Verify desktop runtime and dialog permissions.");
     }
   }
 
@@ -172,10 +171,12 @@ export class AppComponent implements OnDestroy {
       const selection = await open({
         multiple: false,
         directory: false,
-        filters: [{
-          name: "CSV",
-          extensions: ["csv"],
-        }],
+        filters: [
+          {
+            name: "CSV",
+            extensions: ["csv"],
+          },
+        ],
       });
 
       const path = Array.isArray(selection) ? selection[0] : selection;
@@ -193,9 +194,7 @@ export class AppComponent implements OnDestroy {
       this.logsService.error("file-picker", "Unable to open replacement file picker", {
         error: this.extractError(error),
       });
-      this.onDropError(
-        "Unable to open native file picker. Verify Tauri dialog permissions and desktop runtime context.",
-      );
+      this.onDropError("Unable to open native file picker. Verify Tauri dialog permissions and desktop runtime context.");
     }
   }
 
@@ -238,12 +237,13 @@ export class AppComponent implements OnDestroy {
     });
   }
 
+  formatActivityTime(timestamp: number): string {
+    return `${(timestamp / 1000).toFixed(1)}s`;
+  }
+
   private async attachNativeDropLogger(): Promise<void> {
     if (!this.isTauriRuntime()) {
-      this.logsService.warn(
-        "drag-drop.raw",
-        "Tauri runtime not detected; native drag-drop listener was not attached.",
-      );
+      this.logsService.warn("drag-drop.raw", "Tauri runtime not detected; native drag-drop listener was not attached.");
       return;
     }
 
@@ -258,11 +258,7 @@ export class AppComponent implements OnDestroy {
       this.unlistenNativeDropEvents.push(unlisten);
       this.logsService.info("drag-drop.raw", "Attached native drag-drop listener");
     } catch (error) {
-      this.logsService.error(
-        "drag-drop.raw",
-        "Failed to attach native drag-drop listener",
-        { error: this.extractError(error) },
-      );
+      this.logsService.error("drag-drop.raw", "Failed to attach native drag-drop listener", { error: this.extractError(error) });
     }
   }
 

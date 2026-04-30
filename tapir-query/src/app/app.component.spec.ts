@@ -58,7 +58,7 @@ describe("AppComponent", () => {
     await component.exportCsv("exports/query-results.csv");
 
     expect(bridgeMock.exportCsvCalls[0]).toEqual({
-      sql: "SELECT * FROM transactions",
+      sql: "SELECT * FROM transactions LIMIT 1000",
       outputPath: "exports/query-results.csv",
     });
   });

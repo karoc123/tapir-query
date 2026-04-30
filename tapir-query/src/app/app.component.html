@@ -9,7 +9,25 @@
         <app-file-picker [disabled]="loading()" (fileSelected)="onManualFileSelected($event)" (pickerError)="onDropError($event)" />
 
         @if (loading()) {
-          <p class="empty-loading">Preparing preview...</p>
+          <section class="loading-activity" aria-live="polite" aria-busy="true">
+            <div class="loading-activity-head">
+              <span class="loading-spinner" aria-hidden="true"></span>
+              <p class="loading-activity-status">{{ statusMessage() }}</p>
+            </div>
+
+            @if (loadingActivityEntries().length > 0) {
+              <ul class="loading-log-list">
+                @for (entry of loadingActivityEntries(); track entry.id) {
+                  <li class="loading-log-item" [attr.data-level]="entry.level">
+                    <span class="loading-log-time">{{ formatActivityTime(entry.timestamp) }}</span>
+                    <span class="loading-log-level">{{ entry.level.toUpperCase() }}</span>
+                    <span class="loading-log-source">{{ entry.source }}</span>
+                    <span class="loading-log-message">{{ entry.message }}</span>
+                  </li>
+                }
+              </ul>
+            }
+          </section>
         }
 
         <app-query-error-panel [error]="queryError()" />
@@ -20,14 +38,14 @@
   @if (isLoadedLayout()) {
     <section class="loaded-layout" [class.with-sidebar]="!schemaCollapsed()">
       <header class="zone-a action-bar">
-        <button type="button" class="sidebar-toggle" (click)="toggleSchemaSidebar()">
-          {{ schemaToggleLabel() }}
-        </button>
+        <div class="file-stack">
+          <button type="button" class="file-pill file-picker-trigger" [disabled]="loading()" title="Open another CSV file" (click)="onFileNameClicked()">
+            <span class="file-name">{{ currentFileName() ?? "Unknown file" }}</span>
+            <span class="file-meta">{{ currentFileSizeLabel() }}</span>
+          </button>
 
-        <button type="button" class="file-pill file-picker-trigger" [disabled]="loading()" title="Open another CSV file" (click)="onFileNameClicked()">
-          <span class="file-name">{{ currentFileName() ?? "Unknown file" }}</span>
-          <span class="file-meta">{{ currentFileSizeLabel() }}</span>
-        </button>
+          <button type="button" class="schema-toggle-icon" [attr.aria-label]="schemaToggleLabel()" [title]="schemaToggleLabel()" (click)="toggleSchemaSidebar()">&#9776;</button>
+        </div>
 
         <div class="query-stack">
           <app-sql-editor
@@ -41,6 +59,28 @@
           />
 
           <app-query-error-panel [error]="queryError()" />
+
+          @if (loading()) {
+            <section class="loading-activity" aria-live="polite" aria-busy="true">
+              <div class="loading-activity-head">
+                <span class="loading-spinner" aria-hidden="true"></span>
+                <p class="loading-activity-status">{{ statusMessage() }}</p>
+              </div>
+
+              @if (loadingActivityEntries().length > 0) {
+                <ul class="loading-log-list">
+                  @for (entry of loadingActivityEntries(); track entry.id) {
+                    <li class="loading-log-item" [attr.data-level]="entry.level">
+                      <span class="loading-log-time">{{ formatActivityTime(entry.timestamp) }}</span>
+                      <span class="loading-log-level">{{ entry.level.toUpperCase() }}</span>
+                      <span class="loading-log-source">{{ entry.source }}</span>
+                      <span class="loading-log-message">{{ entry.message }}</span>
+                    </li>
+                  }
+                </ul>
+              }
+            </section>
+          }
 
           @if (showSlowLoadHint()) {
             <p class="slow-load-indicator">Loading large result set...</p>

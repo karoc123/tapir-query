@@ -41,6 +41,11 @@ impl CsvQueryService {
             .lock()
             .map_err(|_| AppError::State(String::from("failed to lock file registry")))?;
 
+        if !registry.is_empty() {
+            debug!("csv_query_service clearing previous file registry");
+            registry.clear();
+        }
+
         let registered = self.engine.register_csv(&registry, file_path)?;
 
         registry.insert(registered.table_name.clone(), registered.clone());

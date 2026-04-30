@@ -22,10 +22,8 @@ describe("QueryService", () => {
 
     await service.openFile("/tmp/transactions.csv");
 
-    expect(service.queryHistory()[0]).toBe("SELECT * FROM transactions");
-    expect(JSON.parse(localStorage.getItem("tapir.queryHistory.v1") ?? "[]")[0]).toBe(
-      "SELECT * FROM transactions",
-    );
+    expect(service.queryHistory()[0]).toBe("SELECT * FROM transactions LIMIT 1000");
+    expect(JSON.parse(localStorage.getItem("tapir.queryHistory.v1") ?? "[]")[0]).toBe("SELECT * FROM transactions LIMIT 1000");
   });
 
   it("exports the active SQL result through backend export_csv", async () => {
@@ -35,7 +33,7 @@ describe("QueryService", () => {
     await service.exportCsv("exports/query-results.csv");
 
     expect(bridgeMock.exportCsvCalls[0]).toEqual({
-      sql: "SELECT * FROM transactions",
+      sql: "SELECT * FROM transactions LIMIT 1000",
       outputPath: "exports/query-results.csv",
     });
   });
@@ -63,6 +61,21 @@ describe("QueryService", () => {
     expect(service.rows().length).toBe(1);
     expect(service.activeSortColumn()).toBe("amount");
     expect(service.activeSortDirection()).toBe("asc");
+  });
+
+  it("runs simple COUNT queries through direct execution path", async () => {
+    const service = TestBed.inject(QueryService);
+
+    await service.openFile("/tmp/transactions.csv");
+    service.updateQuery('SELECT count(*) FROM "transactions" WHERE "currency" = \'EUR\'');
+    await service.runQuery();
+
+    expect(bridgeMock.executeQueryCalls[0]).toEqual({
+      sql: 'SELECT count(*) FROM "transactions" WHERE "currency" = \'EUR\'',
+      limit: 1000,
+      offset: 0,
+    });
+    expect(bridgeMock.startQuerySessionCalls.length).toBe(1);
   });
 
   it("clears active sorting when user runs a new query", async () => {

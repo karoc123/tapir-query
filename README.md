@@ -40,14 +40,16 @@ cd tapir-query && pnpm tauri:dev
 - Context-first UI that starts in a single empty-state ingestion surface.
 - Built-in observability for logs and runtime timing telemetry.
 
-## Performance (Phase 3 Highlights)
+## Performance and Responsiveness
 
-Phase 3 introduced benchmark-oriented instrumentation and backend tracing:
+Recent phases focused on reducing first-load latency and keeping the UI responsive while large CSV operations run:
 
-- Backend query responses include `elapsedMs` from Rust/DuckDB execution.
-- Angular DevTools overlay records bootup, file load, query roundtrip, and grid render timings (latest + average).
-- DuckDB connection pooling reduces repeated setup overhead during multi-query sessions.
-- Real-world fixture query test (`reads_real_world_sample_fixture`) completed in `0.31s` test runtime on the current Linux baseline run.
+- Tauri command handlers are async and run blocking DuckDB/IO work in `spawn_blocking` tasks.
+- File open now runs a bounded preview query (`LIMIT 1000`) instead of loading a full result window immediately.
+- Query sessions stream chunks on demand (`start_query_session` + `read_query_session_chunk`) with frontend windowed prefetch.
+- A direct execution fast-path is used for simple `SELECT COUNT(*)` aggregates.
+- DuckDB view registration is cached and stale views are dropped when file context changes.
+- CSV schema inference sampling is bounded (`SAMPLE_SIZE=20000`) to avoid expensive full-file inference.
 
 Re-run the fixture benchmark check locally:
 
@@ -106,7 +108,7 @@ Manual release workflow: `.github/workflows/release.yml`
 - Trigger: `workflow_dispatch` with a `version` input.
 - Generates changelog section from commit history.
 - Syncs version in `package.json`, `tauri.conf.json`, and `Cargo.toml`.
-- Builds Linux and Windows bundles.
+- Builds Windows NSIS `.exe` and Linux `.deb` bundles only.
 - Publishes a draft GitHub release with uploaded artifacts.
 
 ## Developer Commands

@@ -1,9 +1,6 @@
 import { computed, inject, Injectable, signal } from "@angular/core";
 import { QueryChunk, QueryRow } from "../infrastructure/tauri-contracts";
-import {
-  ErrorParsingService,
-  ParsedQueryError,
-} from "../infrastructure/error-parsing.service";
+import { ErrorParsingService, ParsedQueryError } from "../infrastructure/error-parsing.service";
 import { LogService } from "../infrastructure/log.service";
 import { PerfService } from "../infrastructure/perf.service";
 import { TauriBridgeService } from "../infrastructure/tauri-bridge.service";
@@ -132,13 +129,14 @@ export class QueryService {
 
   async openFile(filePath: string): Promise<void> {
     this.logs.info("query", "Opening dropped file", { filePath });
+    this.logs.debug("open-file", "register_csv request enqueued", { filePath });
     this.perf.start("fileLoad");
     await this.closeActiveSession();
 
     this.patch({
       loading: true,
       queryError: null,
-      statusMessage: "Opening CSV file...",
+      statusMessage: "Registering CSV in DuckDB...",
       showSlowLoadHint: false,
       rows: [],
       totalRows: 0,
@@ -148,26 +146,38 @@ export class QueryService {
       activeSortDirection: null,
     });
 
+    await this.yieldToUi();
+
     try {
       const opened = await this.bridge.openFile(filePath);
+      const previewQuery = this.buildPreviewQuery(opened.defaultQuery);
+      this.logs.debug("open-file", "describe_table completed", {
+        tableName: opened.tableName,
+        columns: opened.columns.length,
+      });
       this.fileService.setOpenedFile(opened);
       this.perf.end("fileLoad");
 
-      const nextHistory = this.computeNextHistory(this.state().queryHistory, opened.defaultQuery);
+      const nextHistory = this.computeNextHistory(this.state().queryHistory, previewQuery);
       this.persistHistory(nextHistory);
 
       this.patch({
-        query: opened.defaultQuery,
+        query: previewQuery,
         queryHistory: nextHistory,
         queryError: null,
+        statusMessage: "CSV registered. Preparing initial preview query...",
+      });
+
+      this.logs.info("open-file", "open_file success", {
+        tableName: opened.tableName,
+        columns: opened.columns.length,
       });
 
       await this.executeSqlWithSessionStreaming({
-        sql: opened.defaultQuery,
+        sql: previewQuery,
         resetSort: true,
         statusOnStart: "Running initial preview query...",
-        statusOnFinish: (totalRows, elapsedMs, loadedRows) =>
-          `Loaded ${opened.tableName} with ${totalRows.toLocaleString()} rows in ${elapsedMs} ms (showing ${loadedRows.toLocaleString()}).`,
+        statusOnFinish: (_totalRows, elapsedMs, loadedRows) => `Preview ready for ${opened.tableName}: ${loadedRows.toLocaleString()} rows in ${elapsedMs} ms. Remove LIMIT to run a full-table query.`,
       });
 
       this.logs.info("query", "File loaded and initial query executed", {
@@ -216,12 +226,16 @@ export class QueryService {
       activeSortDirection: null,
     });
 
+    if (this.shouldUseDirectExecution(sql)) {
+      await this.executeSqlDirect(sql);
+      return;
+    }
+
     await this.executeSqlWithSessionStreaming({
       sql,
       resetSort: true,
       statusOnStart: "Running query...",
-      statusOnFinish: (totalRows, elapsedMs, loadedRows) =>
-        `Query ready: ${totalRows.toLocaleString()} rows in ${elapsedMs} ms (showing ${loadedRows.toLocaleString()}).`,
+      statusOnFinish: (totalRows, elapsedMs, loadedRows) => `Query ready: ${totalRows.toLocaleString()} rows in ${elapsedMs} ms (showing ${loadedRows.toLocaleString()}).`,
     });
   }
 
@@ -234,9 +248,7 @@ export class QueryService {
       return;
     }
 
-    const sql =
-      `SELECT * FROM ${this.escapeIdentifier(tableName)} ` +
-      `ORDER BY ${this.escapeIdentifier(columnName)} ${direction.toUpperCase()}`;
+    const sql = `SELECT * FROM ${this.escapeIdentifier(tableName)} ` + `ORDER BY ${this.escapeIdentifier(columnName)} ${direction.toUpperCase()}`;
 
     this.logs.info("query", "Sorting full dataset by column", {
       columnName,
@@ -289,6 +301,8 @@ export class QueryService {
       statusMessage: "Exporting CSV...",
     });
 
+    await this.yieldToUi();
+
     try {
       const exported = await this.bridge.exportCsv({
         sql,
@@ -320,6 +334,13 @@ export class QueryService {
     const requestToken = this.createRequestToken();
     this.windowFetchInFlight = false;
 
+    this.logs.debug("query-session", "start_query_session request received", {
+      sqlLength: options.sql.length,
+      resetSort: options.resetSort,
+      sortColumn: options.sortColumn ?? null,
+      sortDirection: options.sortDirection ?? null,
+    });
+
     const previousSessionId = this.state().activeSessionId;
     if (previousSessionId) {
       await this.closeSessionById(previousSessionId);
@@ -344,9 +365,17 @@ export class QueryService {
           }),
     });
 
+    await this.yieldToUi();
+
     try {
       const session = await this.bridge.startQuerySession({
         sql: options.sql,
+      });
+
+      this.logs.info("query-session", "start_query_session success", {
+        sessionId: session.sessionId,
+        totalRows: session.totalRows,
+        elapsedMs: session.elapsedMs,
       });
 
       if (!this.isActiveRequest(requestToken)) {
@@ -356,6 +385,16 @@ export class QueryService {
 
       this.perf.end("queryRoundTrip");
       this.perf.record("queryEngine", session.elapsedMs);
+
+      this.patch({
+        statusMessage: "Query session ready. Fetching first rows...",
+      });
+
+      this.logs.debug("query-session", "read_query_session_chunk request received", {
+        sessionId: session.sessionId,
+        limit: this.initialChunkSize,
+        offset: 0,
+      });
 
       this.perf.start("queryRoundTrip");
       const firstChunk = await this.bridge.readQuerySessionChunk({
@@ -371,12 +410,16 @@ export class QueryService {
       }
 
       this.perf.record("queryEngine", firstChunk.elapsedMs);
+      this.logs.debug("query-session", "read_query_session_chunk success", {
+        rows: firstChunk.rows.length,
+        offset: firstChunk.offset,
+        nextOffset: firstChunk.nextOffset,
+        elapsedMs: firstChunk.elapsedMs,
+      });
       this.perf.start("renderGrid");
 
       const initialRows = [...firstChunk.rows];
-      const status =
-        `${options.statusOnFinish(session.totalRows, session.elapsedMs, initialRows.length)} ` +
-        this.buildWindowStatus(firstChunk.offset, initialRows.length, session.totalRows);
+      const status = `${options.statusOnFinish(session.totalRows, session.elapsedMs, initialRows.length)} ` + this.buildWindowStatus(firstChunk.offset, initialRows.length, session.totalRows);
 
       this.state.update((current) => ({
         ...current,
@@ -409,6 +452,86 @@ export class QueryService {
       });
       this.clearSlowLoadTimer();
       this.logs.error("query", "Query execution failed", {
+        error: parsed.rawMessage,
+      });
+    }
+  }
+
+  private async executeSqlDirect(sql: string): Promise<void> {
+    const requestToken = this.createRequestToken();
+    this.windowFetchInFlight = false;
+
+    const previousSessionId = this.state().activeSessionId;
+    if (previousSessionId) {
+      await this.closeSessionById(previousSessionId);
+    }
+
+    this.perf.start("queryRoundTrip");
+    this.beginSlowLoadWatch();
+    this.patch({
+      loading: true,
+      showSlowLoadHint: false,
+      queryError: null,
+      rows: [],
+      totalRows: 0,
+      windowStartOffset: 0,
+      activeSessionId: null,
+      statusMessage: "Running aggregate query...",
+      activeSortColumn: null,
+      activeSortDirection: null,
+    });
+
+    await this.yieldToUi();
+
+    try {
+      const chunk = await this.bridge.executeQuery({
+        sql,
+        limit: this.initialChunkSize,
+        offset: 0,
+      });
+
+      if (!this.isActiveRequest(requestToken)) {
+        return;
+      }
+
+      this.perf.end("queryRoundTrip");
+      this.perf.record("queryEngine", chunk.elapsedMs);
+      this.perf.start("renderGrid");
+
+      const rows = [...chunk.rows];
+      const totalRows = chunk.offset + rows.length + (chunk.nextOffset !== null ? 1 : 0);
+
+      this.state.update((current) => ({
+        ...current,
+        columns: [...chunk.columns],
+        rows,
+        totalRows: Math.max(rows.length, totalRows),
+        windowStartOffset: chunk.offset,
+        activeSessionId: null,
+        loading: false,
+        showSlowLoadHint: false,
+        queryError: null,
+        statusMessage: `Query ready: ${rows.length.toLocaleString()} rows in ${chunk.elapsedMs} ms (direct mode).`,
+        lastQueryElapsedMs: chunk.elapsedMs,
+        effectiveSql: sql,
+      }));
+
+      this.clearSlowLoadTimer();
+    } catch (error) {
+      this.perf.end("queryRoundTrip");
+      if (!this.isActiveRequest(requestToken)) {
+        return;
+      }
+
+      const parsed = this.parseError(error);
+      this.patch({
+        loading: false,
+        showSlowLoadHint: false,
+        queryError: parsed,
+        statusMessage: "Query execution failed.",
+      });
+      this.clearSlowLoadTimer();
+      this.logs.error("query", "Direct query execution failed", {
         error: parsed.rawMessage,
       });
     }
@@ -502,11 +625,7 @@ export class QueryService {
       }
 
       const merged = this.mergeWindow(current.rows, loadedStart, chunk, effectiveMode);
-      const status = this.buildWindowStatus(
-        merged.windowStartOffset,
-        merged.rows.length,
-        current.totalRows,
-      );
+      const status = this.buildWindowStatus(merged.windowStartOffset, merged.rows.length, current.totalRows);
 
       return {
         ...current,
@@ -519,12 +638,7 @@ export class QueryService {
     });
   }
 
-  private mergeWindow(
-    currentRows: QueryRow[],
-    currentStart: number,
-    chunk: QueryChunk,
-    mode: WindowMergeMode,
-  ): { rows: QueryRow[]; windowStartOffset: number } {
+  private mergeWindow(currentRows: QueryRow[], currentStart: number, chunk: QueryChunk, mode: WindowMergeMode): { rows: QueryRow[]; windowStartOffset: number } {
     if (mode === "jump") {
       return {
         rows: [...chunk.rows].slice(0, this.windowSize),
@@ -615,14 +729,8 @@ export class QueryService {
       this.logs.info("signals", "Query state patch", {
         changedKeys,
         loading: previous.loading !== this.state().loading ? this.state().loading : undefined,
-        statusMessage:
-          previous.statusMessage !== this.state().statusMessage
-            ? this.state().statusMessage
-            : undefined,
-        queryError:
-          previous.queryError?.summary !== this.state().queryError?.summary
-            ? this.state().queryError?.summary
-            : undefined,
+        statusMessage: previous.statusMessage !== this.state().statusMessage ? this.state().statusMessage : undefined,
+        queryError: previous.queryError?.summary !== this.state().queryError?.summary ? this.state().queryError?.summary : undefined,
       });
     }
   }
@@ -672,9 +780,7 @@ export class QueryService {
         return [];
       }
 
-      return parsed
-        .filter((item): item is string => typeof item === "string")
-        .slice(0, 20);
+      return parsed.filter((item): item is string => typeof item === "string").slice(0, 20);
     } catch {
       return [];
     }
@@ -692,11 +798,39 @@ export class QueryService {
     }
   }
 
+  private shouldUseDirectExecution(sql: string): boolean {
+    const normalized = sql.trim().replace(/;+\s*$/, "");
+    if (!/^select\s+count\s*\(\s*(\*|1)\s*\)\s+from\s+/i.test(normalized)) {
+      return false;
+    }
+
+    return !/\b(group\s+by|having|union|intersect|except)\b|\bover\s*\(/i.test(normalized);
+  }
+
+  private buildPreviewQuery(sql: string): string {
+    const normalized = sql.trim().replace(/;+\s*$/, "");
+    if (/\blimit\s+\d+\b/i.test(normalized)) {
+      return normalized;
+    }
+
+    return `${normalized} LIMIT ${this.initialChunkSize}`;
+  }
+
   private escapeIdentifier(identifier: string): string {
     return `"${identifier.replace(/"/g, '""')}"`;
   }
 
   private parseError(error: unknown): ParsedQueryError {
     return this.errorParser.parse(error);
+  }
+
+  private async yieldToUi(): Promise<void> {
+    if (typeof requestAnimationFrame !== "function") {
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
   }
 }

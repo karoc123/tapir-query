@@ -1,6 +1,6 @@
 import { Injectable, computed, signal } from "@angular/core";
 
-export type LogLevel = "info" | "warn" | "error";
+export type LogLevel = "debug" | "info" | "warn" | "error";
 
 export interface LogEntry {
   id: number;
@@ -19,16 +19,15 @@ export class LogService {
   private nextId = 1;
 
   private readonly entriesState = signal<LogEntry[]>([]);
-  private readonly drawerOpenState = signal(false);
 
   readonly entries = computed(() => this.entriesState());
-  readonly drawerOpen = computed(() => this.drawerOpenState());
-  readonly errorCount = computed(
-    () => this.entriesState().filter((entry) => entry.level === "error").length,
-  );
 
   info(source: string, message: string, details?: unknown): void {
     this.push("info", source, message, details);
+  }
+
+  debug(source: string, message: string, details?: unknown): void {
+    this.push("debug", source, message, details);
   }
 
   warn(source: string, message: string, details?: unknown): void {
@@ -41,18 +40,6 @@ export class LogService {
 
   clear(): void {
     this.entriesState.set([]);
-  }
-
-  openDrawer(): void {
-    this.drawerOpenState.set(true);
-  }
-
-  closeDrawer(): void {
-    this.drawerOpenState.set(false);
-  }
-
-  toggleDrawer(): void {
-    this.drawerOpenState.update((open) => !open);
   }
 
   private push(level: LogLevel, source: string, message: string, details?: unknown): void {

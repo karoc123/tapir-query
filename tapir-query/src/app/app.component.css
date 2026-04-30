@@ -59,15 +59,6 @@
   color: var(--tapir-text-muted);
 }
 
-.empty-loading {
-  margin: 0;
-  color: var(--tapir-accent-strong);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 0.69rem;
-  animation: pulse-dot 900ms ease-in-out infinite;
-}
-
 .loaded-layout {
   min-height: calc(100vh - 2rem);
   display: grid;
@@ -111,12 +102,12 @@
   box-shadow: 0 14px 32px var(--tapir-panel-shadow);
   padding: 0.65rem;
   display: grid;
-  grid-template-columns: auto auto 1fr auto;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 0.55rem;
 }
 
-.sidebar-toggle,
+.schema-toggle-icon,
 .action-button,
 .icon-button {
   border: 1px solid var(--tapir-border);
@@ -128,18 +119,26 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-weight: 700;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
 }
 
-.sidebar-toggle:hover,
+.schema-toggle-icon:hover,
 .action-button:hover,
 .icon-button:hover {
   border-color: var(--tapir-border-strong);
   background: color-mix(in srgb, var(--tapir-accent) 12%, var(--tapir-surface-alt));
 }
 
-.file-pill {
+.file-stack {
   min-width: 10rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.file-pill {
   border: 1px solid var(--tapir-border-soft);
   border-radius: 0.7rem;
   background: var(--tapir-surface-alt);
@@ -170,6 +169,17 @@
 .file-meta {
   font-size: 0.66rem;
   color: var(--tapir-text-muted);
+}
+
+.schema-toggle-icon {
+  width: 2.1rem;
+  min-width: 2.1rem;
+  height: 1.55rem;
+  padding: 0;
+  font-size: 0.88rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .query-stack {

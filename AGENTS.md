@@ -11,7 +11,10 @@ This file is the operating guide for coding agents working in this repository.
 - `LayoutStateService` owns layout transitions.
 - `ErrorParsingService` converts raw Tauri/Rust errors to display-safe DTOs.
 - `OpenFileResponse` includes `fileSizeBytes` across Rust and TypeScript contracts.
+- Tauri command handlers are async and dispatch heavy work through `spawn_blocking`.
+- Query flow defaults to session streaming (`start_query_session` + `read_query_session_chunk`) with a direct fast-path for simple `COUNT(*)` queries.
 - Linux Snap GLIBC workaround is required for local dev (`pnpm tauri:dev` handles env sanitization).
+- Release pipeline currently ships Windows NSIS `.exe` and Linux `.deb` artifacts only.
 
 ## Default Plan (How To Approach Any Task)
 

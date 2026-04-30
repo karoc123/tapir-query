@@ -17,7 +17,7 @@ Primary goals:
 flowchart LR
   UI[Angular 21 UI<br/>Standalone + Signals] --> Domain[Domain Services<br/>FileService / QueryService]
   Domain --> Bridge[Tauri Bridge Service<br/>invoke wrapper]
-  Bridge --> Cmd[Tauri Commands<br/>open_file / execute_query / export_csv / export_rows]
+  Bridge --> Cmd[Tauri Commands<br/>open_file / execute_query / start_query_session / read_query_session_chunk / close_query_session / export_csv / export_rows]
   Cmd --> Svc[CsvQueryService]
   Svc --> Engine[DuckDbEngine]
   Engine --> Pool[DuckDB Connection Pool]
@@ -50,14 +50,29 @@ Responsibilities:
 - `engine`: query execution abstraction and DuckDB implementation.
 - `error`: typed `AppError` categories (`Validation`, `Io`, `Sql`, `State`).
 
+Command execution model:
+
+- Tauri command functions are async.
+- Blocking work (DuckDB operations, CSV export writes, filesystem-heavy actions) is executed on the blocking runtime via `spawn_blocking`.
+- Command handlers keep orchestration thin and delegate behavior to `CsvQueryService`/engine.
+
 ### 3.1 DuckDB Connection Pooling
 
 `DuckDbEngine` uses a synchronized pool (`DuckDbPool`) of in-memory DuckDB `Connection` instances.
 
-- Pool size defaults to 4 and never drops below 1.
+- Pool size is clamped to at least 1 and currently defaults to 1 in production runtime.
 - On each operation, the service acquires a pooled connection.
 - Registered CSV views are synchronized into that connection context.
 - Connection is returned to the pool by RAII drop (`PooledConnection`).
+
+The current default of 1 is intentional because query sessions are materialized into temporary in-memory tables tied to the active connection.
+
+### 3.2 Registration and Session Optimizations
+
+- Registered CSV views are cached per table/path to avoid repeated `CREATE OR REPLACE VIEW` for unchanged inputs.
+- Stale views are dropped when registry/table context changes.
+- Query sessions materialize SQL once (`start_query_session`) and stream paged rows (`read_query_session_chunk`).
+- `read_csv_auto` uses bounded inference sampling (`SAMPLE_SIZE=20000`) to reduce first-open overhead.
 
 This design reduces repeated connection creation overhead during iterative query sessions.
 
@@ -110,17 +125,20 @@ Command surface:
 
 - `open_file`
 - `execute_query`
+- `start_query_session`
+- `read_query_session_chunk`
+- `close_query_session`
 - `export_csv`
 - `export_rows`
 
 ### 5.1 Command-Level DTO Mapping (Rust ↔ TypeScript)
 
-| Command | Rust Request DTO | TS Request Contract | Rust Response DTO | TS Response Contract |
-| :--- | :--- | :--- | :--- | :--- |
-| `open_file` | `OpenFileRequest { file_path }` | invoke payload `{ request: { filePath } }` | `OpenFileResponse { table_name, file_path, columns, default_query, file_size_bytes }` | `OpenFileResponse { tableName, filePath, columns, defaultQuery, fileSizeBytes }` |
-| `execute_query` | `ExecuteQueryRequest { sql, limit, offset }` | `ExecuteQueryRequest` | `QueryChunk` | `QueryChunk` |
-| `export_csv` | `ExportCsvRequest { sql, output_path }` | `ExportCsvRequest` | `ExportCsvResponse` | `ExportCsvResponse` |
-| `export_rows` | `ExportRowsRequest { output_path, columns, rows }` | `ExportRowsRequest` | `ExportCsvResponse` | `ExportCsvResponse` |
+| Command         | Rust Request DTO                                   | TS Request Contract                        | Rust Response DTO                                                                     | TS Response Contract                                                             |
+| :-------------- | :------------------------------------------------- | :----------------------------------------- | :------------------------------------------------------------------------------------ | :------------------------------------------------------------------------------- |
+| `open_file`     | `OpenFileRequest { file_path }`                    | invoke payload `{ request: { filePath } }` | `OpenFileResponse { table_name, file_path, columns, default_query, file_size_bytes }` | `OpenFileResponse { tableName, filePath, columns, defaultQuery, fileSizeBytes }` |
+| `execute_query` | `ExecuteQueryRequest { sql, limit, offset }`       | `ExecuteQueryRequest`                      | `QueryChunk`                                                                          | `QueryChunk`                                                                     |
+| `export_csv`    | `ExportCsvRequest { sql, output_path }`            | `ExportCsvRequest`                         | `ExportCsvResponse`                                                                   | `ExportCsvResponse`                                                              |
+| `export_rows`   | `ExportRowsRequest { output_path, columns, rows }` | `ExportRowsRequest`                        | `ExportCsvResponse`                                                                   | `ExportCsvResponse`                                                              |
 
 ### 5.2 Field Naming Rules
 
@@ -138,6 +156,7 @@ Example mapping:
 - Query result rows are serialized as string-or-null cell values.
 - Pagination fields: `limit`, `offset`, `nextOffset`.
 - Engine execution timing is returned as `elapsedMs`.
+- Frontend default path uses session streaming for large result windows and a direct execute path for simple `COUNT(*)` queries.
 
 ## 6. Observability and Benchmarking
 
@@ -193,4 +212,4 @@ Fixtures:
 
 - Manual release workflow: `.github/workflows/release.yml` (`workflow_dispatch`).
 - Version synchronization is applied to `package.json`, `tauri.conf.json`, and `Cargo.toml`.
-- Linux and Windows artifacts are produced and uploaded to a draft GitHub release.
+- Windows NSIS `.exe` and Linux `.deb` artifacts are produced and uploaded to a draft GitHub release.

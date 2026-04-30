@@ -41,10 +41,14 @@ pub fn escape_string_literal(value: &str) -> String {
 
 pub fn build_register_view_sql(table_name: &str, csv_path: &str) -> String {
     format!(
-        "CREATE OR REPLACE VIEW {} AS SELECT * FROM read_csv_auto('{}', SAMPLE_SIZE=-1, IGNORE_ERRORS=true);",
+        "CREATE OR REPLACE VIEW {} AS SELECT * FROM read_csv_auto('{}', SAMPLE_SIZE=20000, IGNORE_ERRORS=true);",
         quote_identifier(table_name),
         escape_string_literal(csv_path)
     )
+}
+
+pub fn build_drop_view_sql(table_name: &str) -> String {
+    format!("DROP VIEW IF EXISTS {}", quote_identifier(table_name))
 }
 
 pub fn build_default_query(table_name: &str) -> String {

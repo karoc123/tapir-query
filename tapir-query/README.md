@@ -5,10 +5,11 @@ This directory contains the Angular frontend and the Tauri v2 backend project.
 ## Features
 
 - CodeMirror SQL editor with `Ctrl/Cmd+Enter` run shortcut.
+- CodeMirror completion with `Ctrl+Space` (`Cmd+Space` on macOS).
 - Schema explorer sidebar with query history recall (last 20 successful queries).
-- Chunked query execution and virtualized table rendering.
-- Typed IPC bridge for `open_file`, `execute_query`, `export_csv`, and `export_rows`.
-- Log Console drawer for IPC errors, drag-drop validation, and signal state transitions.
+- Session-based chunked query execution and virtualized table rendering.
+- Typed IPC bridge for `open_file`, `execute_query`, `start_query_session`, `read_query_session_chunk`, `close_query_session`, `export_csv`, and `export_rows`.
+- Loading activity panel with latest backend/frontend log breadcrumbs during long-running operations.
 - DevTools performance overlay for bootup, file load, query, and grid render timings.
 
 ## Development
