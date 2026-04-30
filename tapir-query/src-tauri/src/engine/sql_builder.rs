@@ -79,9 +79,7 @@ pub fn build_count_sql(sql: &str) -> String {
 
 pub fn build_column_value_scope_sql(sql: &str, column_name: &str) -> String {
     let quoted_column = quote_identifier(column_name);
-    format!(
-        "SELECT CAST({quoted_column} AS VARCHAR) AS tapir_value FROM ({sql}) AS tapir_result"
-    )
+    format!("SELECT CAST({quoted_column} AS VARCHAR) AS tapir_value FROM ({sql}) AS tapir_result")
 }
 
 pub fn build_export_csv_sql(sql: &str, output_path: &str) -> String {
@@ -127,15 +125,12 @@ mod tests {
 
     #[test]
     fn builds_column_value_scope_sql() {
-        let sql = build_column_value_scope_sql(
-            "SELECT customer_id FROM transactions",
-            "customer_id",
-        );
+        let sql =
+            build_column_value_scope_sql("SELECT customer_id FROM transactions", "customer_id");
 
         assert_eq!(
             sql,
             "SELECT CAST(\"customer_id\" AS VARCHAR) AS tapir_value FROM (SELECT customer_id FROM transactions) AS tapir_result"
         );
     }
-
 }

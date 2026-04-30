@@ -1,2 +1,52 @@
-<label class="sr-only" for="tapir-sql-input">SQL query</label>
-<div #editorHost id="tapir-sql-input" class="sql-input" role="textbox" aria-multiline="true" [attr.aria-disabled]="loading()"></div>
+<div class="sql-editor-shell">
+  <label class="sr-only" for="tapir-sql-input">SQL query</label>
+
+  <div class="sql-input-shell">
+    <div #editorHost id="tapir-sql-input" class="sql-input" role="textbox" aria-multiline="true" [attr.aria-disabled]="loading()"></div>
+
+    <div class="sql-action-stack">
+      <button
+        #historyTrigger
+        type="button"
+        class="history-trigger"
+        aria-label="Open query history"
+        [title]="historyTooltip"
+        [attr.aria-expanded]="historyMenuOpen()"
+        [disabled]="loading()"
+        (click)="toggleHistoryMenu()"
+      >
+        <span aria-hidden="true">&#128339;</span>
+      </button>
+
+      <button type="button" class="execute-trigger" aria-label="Run query" [title]="executeTooltip" [disabled]="loading()" (click)="requestRun()">
+        <span aria-hidden="true">&#9654;</span>
+      </button>
+    </div>
+
+    @if (historyMenuOpen()) {
+      <div #historyMenu class="history-menu" role="listbox" aria-label="Successful query history">
+        @if (historyEntries().length === 0) {
+          <p class="history-empty">No successful queries yet.</p>
+        } @else {
+          <ul class="history-list">
+            @for (entry of historyEntries(); track trackHistoryEntry($index, entry)) {
+              <li>
+                <button
+                  type="button"
+                  class="history-item"
+                  [class.active]="isHistoryEntryActive(entry)"
+                  [attr.aria-selected]="isHistoryEntryActive(entry)"
+                  [title]="entry.sql"
+                  (click)="selectHistoryEntry(entry)"
+                >
+                  <span class="history-sql">{{ entry.sql }}</span>
+                  <span class="history-time">{{ formatRelativeTime(entry.executedAtUnixMs) }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    }
+  </div>
+</div>

@@ -38,46 +38,46 @@
   @if (isLoadedLayout()) {
     <section class="loaded-layout" [class.with-sidebar]="analysisPanelOpen()">
       <header class="zone-a action-bar">
-        <div class="action-meta-row">
-          <div class="file-stack">
-            <button type="button" class="file-pill file-picker-trigger" [disabled]="loading()" title="Open another CSV file" (click)="onFileNameClicked()">
-              <span class="file-name">{{ currentFileName() ?? "Unknown file" }}</span>
-              <span class="file-meta">{{ currentFileSizeLabel() }}</span>
-            </button>
+        <div class="action-layout">
+          <div class="action-side">
+            <div class="file-stack">
+              <button type="button" class="file-pill file-picker-trigger" [disabled]="loading()" title="Open another CSV file" (click)="onFileNameClicked()">
+                <span class="file-name">{{ currentFileName() ?? "Unknown file" }}</span>
+                <span class="file-meta">{{ currentFileSizeLabel() }}</span>
+              </button>
+            </div>
+
+            <div class="side-actions">
+              <button type="button" class="icon-button" aria-label="Open settings" title="Settings" (click)="toggleSettings()">&#9881;</button>
+              <button type="button" class="icon-button" aria-label="Open cheat sheet" title="DuckDB cheat sheet" (click)="toggleCheatSheet()">?</button>
+              <button
+                type="button"
+                class="action-button analysis-button"
+                [class.active]="analysisPanelOpen()"
+                [disabled]="loading() || !effectiveSql()"
+                [attr.aria-label]="analysisToggleLabel()"
+                [title]="analysisToggleLabel()"
+                (click)="toggleAnalysisPanel()"
+              >
+                Analyze
+              </button>
+              <button type="button" class="action-button export-button" [disabled]="loading()" (click)="exportResults()">Export</button>
+            </div>
           </div>
 
-          <div class="metadata-tools">
-            <button type="button" class="icon-button" aria-label="Open settings" title="Settings" (click)="toggleSettings()">&#9881;</button>
-            <button type="button" class="icon-button" aria-label="Open cheat sheet" title="DuckDB cheat sheet" (click)="toggleCheatSheet()">?</button>
+          <div class="query-stack">
+            <app-sql-editor
+              [query]="query()"
+              [loading]="loading()"
+              [tableName]="currentTable()"
+              [schemaColumns]="schemaColumns()"
+              [historyEntries]="historyEntries()"
+              [placeholder]="'Write SQL and press Ctrl/Cmd + Enter'"
+              (queryChange)="onQueryChanged($event)"
+              (historySelected)="onHistorySelected($event)"
+              (runRequested)="runQuery()"
+            />
           </div>
-
-          <div class="command-center">
-            <button type="button" class="action-button execute-button" [disabled]="loading()" (click)="runQuery()">Execute</button>
-            <button
-              type="button"
-              class="action-button analysis-button"
-              [class.active]="analysisPanelOpen()"
-              [disabled]="loading() || !effectiveSql()"
-              [attr.aria-label]="analysisToggleLabel()"
-              [title]="analysisToggleLabel()"
-              (click)="toggleAnalysisPanel()"
-            >
-              Analyze
-            </button>
-            <button type="button" class="action-button export-button" [disabled]="loading()" (click)="exportResults()">Export</button>
-          </div>
-        </div>
-
-        <div class="query-stack">
-          <app-sql-editor
-            [query]="query()"
-            [loading]="loading()"
-            [tableName]="currentTable()"
-            [schemaColumns]="schemaColumns()"
-            [placeholder]="'Write SQL and press Ctrl/Cmd + Enter'"
-            (queryChange)="onQueryChanged($event)"
-            (runRequested)="runQuery()"
-          />
         </div>
       </header>
 

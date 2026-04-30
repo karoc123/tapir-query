@@ -1,8 +1,9 @@
 import { CommonModule } from "@angular/common";
-import { afterNextRender, Component, computed, effect, inject, OnDestroy, signal, untracked } from "@angular/core";
+import { afterNextRender, Component, computed, effect, inject, OnDestroy, signal, untracked, ViewChild } from "@angular/core";
 import { DataAnalysisPluginService } from "./domain/data-analysis-plugin.service";
 import { DatasetMetricsService } from "./domain/dataset-metrics.service";
 import { FileService } from "./domain/file.service";
+import { HistoryService } from "./domain/history.service";
 import { IngestionService } from "./domain/ingestion.service";
 import { QueryService } from "./domain/query.service";
 import type { FilterIntent } from "./domain/sql-generator.service";
@@ -43,6 +44,7 @@ import { AppTheme, ThemeService } from "./infrastructure/theme.service";
 export class AppComponent implements OnDestroy {
   private readonly fileService = inject(FileService);
   private readonly queryService = inject(QueryService);
+  private readonly historyService = inject(HistoryService);
   private readonly dataAnalysisPluginService = inject(DataAnalysisPluginService);
   private readonly datasetMetricsService = inject(DatasetMetricsService);
   private readonly ingestionService = inject(IngestionService);
@@ -53,6 +55,9 @@ export class AppComponent implements OnDestroy {
 
   private readonly unlistenNativeDropEvents: Array<() => void> = [];
 
+  @ViewChild(SqlEditorComponent)
+  private readonly sqlEditor?: SqlEditorComponent;
+
   readonly loading = this.queryService.loading;
   readonly currentFilePath = this.fileService.currentFilePath;
   readonly currentFileName = this.fileService.currentFileName;
@@ -60,6 +65,7 @@ export class AppComponent implements OnDestroy {
   readonly currentTable = this.fileService.currentTable;
   readonly schemaColumns = this.fileService.schemaColumns;
   readonly query = this.queryService.query;
+  readonly historyEntries = this.historyService.entries;
   readonly queryError = this.queryService.queryError;
   readonly columns = this.queryService.columns;
   readonly rows = this.queryService.rows;
@@ -237,8 +243,16 @@ export class AppComponent implements OnDestroy {
     this.queryService.updateQuery(query);
   }
 
-  runQuery(): Promise<void> {
-    return this.queryService.runQuery();
+  onHistorySelected(query: string): void {
+    this.queryService.selectHistoryQuery(query);
+  }
+
+  async runQuery(): Promise<void> {
+    try {
+      await this.queryService.runQuery();
+    } finally {
+      this.focusQueryEditorSoon();
+    }
   }
 
   exportCsv(outputPath: string): Promise<void> {
@@ -550,5 +564,18 @@ export class AppComponent implements OnDestroy {
     } catch {
       // Ignore storage limitations.
     }
+  }
+
+  private focusQueryEditorSoon(): void {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        this.sqlEditor?.focusEditor();
+      });
+      return;
+    }
+
+    setTimeout(() => {
+      this.sqlEditor?.focusEditor();
+    }, 0);
   }
 }

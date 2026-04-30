@@ -3,8 +3,10 @@ use crate::error::AppError;
 use crate::AppState;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::io::ErrorKind;
 use std::path::PathBuf;
-use tauri::{async_runtime, State};
+use tauri::{async_runtime, Manager, State};
+use tokio::fs;
 use tracing::{error, info, warn};
 
 #[derive(Debug, Deserialize)]
@@ -97,6 +99,25 @@ pub struct ExportCsvResponse {
     pub rows_written: u64,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryHistoryEntry {
+    pub sql: String,
+    pub executed_at_unix_ms: i64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryHistoryResponse {
+    pub entries: Vec<QueryHistoryEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveQueryHistoryRequest {
+    pub entries: Vec<QueryHistoryEntry>,
+}
+
 fn map_error(error: AppError) -> String {
     error!("command failed: {error}");
     error.to_string()
@@ -106,6 +127,36 @@ fn map_join_error(context: &str, error: impl std::fmt::Display) -> String {
     map_error(AppError::State(format!(
         "{context} task join failed: {error}"
     )))
+}
+
+fn resolve_query_history_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
+    app_handle
+        .path()
+        .app_data_dir()
+        .map(|directory| directory.join("query-history.json"))
+        .map_err(|error| {
+            map_error(AppError::State(format!(
+                "failed to resolve app data directory: {error}"
+            )))
+        })
+}
+
+fn sanitize_query_history(entries: Vec<QueryHistoryEntry>) -> Vec<QueryHistoryEntry> {
+    entries
+        .into_iter()
+        .filter_map(|entry| {
+            let normalized_sql = entry.sql.trim();
+            if normalized_sql.is_empty() {
+                return None;
+            }
+
+            Some(QueryHistoryEntry {
+                sql: normalized_sql.to_string(),
+                executed_at_unix_ms: entry.executed_at_unix_ms.max(0),
+            })
+        })
+        .take(50)
+        .collect()
 }
 
 #[tauri::command]
@@ -139,6 +190,92 @@ pub async fn open_file(
 }
 
 #[tauri::command]
+pub async fn load_query_history(
+    app_handle: tauri::AppHandle,
+) -> Result<QueryHistoryResponse, String> {
+    let history_path = resolve_query_history_path(&app_handle)?;
+    info!(
+        "load_query_history request received path={}",
+        history_path.display()
+    );
+
+    let content = match fs::read_to_string(&history_path).await {
+        Ok(content) => content,
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            info!("load_query_history file not found, returning empty history");
+            return Ok(QueryHistoryResponse {
+                entries: Vec::new(),
+            });
+        }
+        Err(error) => {
+            return Err(map_error(AppError::Io(format!(
+                "failed to read query history file {}: {error}",
+                history_path.display()
+            ))));
+        }
+    };
+
+    if content.trim().is_empty() {
+        return Ok(QueryHistoryResponse {
+            entries: Vec::new(),
+        });
+    }
+
+    let parsed: Vec<QueryHistoryEntry> = serde_json::from_str(&content).map_err(|error| {
+        map_error(AppError::State(format!(
+            "failed to parse query history JSON: {error}"
+        )))
+    })?;
+
+    let entries = sanitize_query_history(parsed);
+
+    info!("load_query_history success entries={}", entries.len());
+
+    Ok(QueryHistoryResponse { entries })
+}
+
+#[tauri::command]
+pub async fn save_query_history(
+    request: SaveQueryHistoryRequest,
+    app_handle: tauri::AppHandle,
+) -> Result<QueryHistoryResponse, String> {
+    let history_path = resolve_query_history_path(&app_handle)?;
+    let entries = sanitize_query_history(request.entries);
+
+    if let Some(parent) = history_path.parent() {
+        fs::create_dir_all(parent).await.map_err(|error| {
+            map_error(AppError::Io(format!(
+                "failed to create query history directory {}: {error}",
+                parent.display()
+            )))
+        })?;
+    }
+
+    let serialized = serde_json::to_string_pretty(&entries).map_err(|error| {
+        map_error(AppError::State(format!(
+            "failed to serialize query history: {error}"
+        )))
+    })?;
+
+    fs::write(&history_path, serialized)
+        .await
+        .map_err(|error| {
+            map_error(AppError::Io(format!(
+                "failed to write query history file {}: {error}",
+                history_path.display()
+            )))
+        })?;
+
+    info!(
+        "save_query_history success path={} entries={}",
+        history_path.display(),
+        entries.len()
+    );
+
+    Ok(QueryHistoryResponse { entries })
+}
+
+#[tauri::command]
 pub async fn execute_query(
     request: ExecuteQueryRequest,
     state: State<'_, AppState>,
@@ -153,10 +290,11 @@ pub async fn execute_query(
     let limit = request.limit.unwrap_or(200);
     let offset = request.offset.unwrap_or(0);
 
-    let chunk = async_runtime::spawn_blocking(move || csv_service.execute_query(&sql, limit, offset))
-        .await
-        .map_err(|error| map_join_error("execute_query", error))?
-        .map_err(map_error)?;
+    let chunk =
+        async_runtime::spawn_blocking(move || csv_service.execute_query(&sql, limit, offset))
+            .await
+            .map_err(|error| map_join_error("execute_query", error))?
+            .map_err(map_error)?;
 
     info!(
         "execute_query success rows={} columns={} next_offset={:?} elapsed_ms={}",
@@ -251,7 +389,7 @@ pub async fn read_query_session_chunk(
     })
     .await
     .map_err(|error| map_join_error("read_query_session_chunk", error))?
-        .map_err(map_error)
+    .map_err(map_error)
 }
 
 #[tauri::command]
@@ -296,9 +434,7 @@ pub async fn export_csv(
 }
 
 #[tauri::command]
-pub async fn export_rows(
-    request: ExportRowsRequest,
-) -> Result<ExportCsvResponse, String> {
+pub async fn export_rows(request: ExportRowsRequest) -> Result<ExportCsvResponse, String> {
     info!(
         "export_rows request received output={} rows={} columns={}",
         request.output_path,

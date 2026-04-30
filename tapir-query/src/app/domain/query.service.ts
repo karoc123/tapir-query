@@ -5,6 +5,7 @@ import { LogService } from "../infrastructure/log.service";
 import { PerfService } from "../infrastructure/perf.service";
 import { TauriBridgeService } from "../infrastructure/tauri-bridge.service";
 import { FileService } from "./file.service";
+import { QueryExecutionEventsService } from "./query-execution-events.service";
 import { SqlGeneratorService } from "./sql-generator.service";
 import type { FilterIntent } from "./sql-generator.service";
 
@@ -24,7 +25,6 @@ interface QueryState {
   queryError: ParsedQueryError | null;
   statusMessage: string;
   lastQueryElapsedMs: number | null;
-  queryHistory: string[];
   activeSortColumn: string | null;
   activeSortDirection: SortDirection | null;
   effectiveSql: string | null;
@@ -55,6 +55,7 @@ export class QueryService {
   private readonly errorParser = inject(ErrorParsingService);
   private readonly logs = inject(LogService);
   private readonly perf = inject(PerfService);
+  private readonly queryExecutionEvents = inject(QueryExecutionEventsService);
   private readonly sqlGenerator = inject(SqlGeneratorService);
 
   private readonly initialChunkSize = 1_000;
@@ -62,7 +63,6 @@ export class QueryService {
   private readonly windowSize = 10_000;
   private readonly prefetchThreshold = 300;
   private readonly firstSessionChunkTimeoutMs = 2_500;
-  private readonly historyStorageKey = "tapir.queryHistory.v1";
 
   private requestToken = 0;
   private slowLoadTimer: ReturnType<typeof setTimeout> | null = null;
@@ -80,7 +80,6 @@ export class QueryService {
     queryError: null,
     statusMessage: "Drop a CSV file to start querying.",
     lastQueryElapsedMs: null,
-    queryHistory: this.loadHistory(),
     activeSortColumn: null,
     activeSortDirection: null,
     effectiveSql: null,
@@ -97,7 +96,6 @@ export class QueryService {
   readonly errorMessage = computed(() => this.state().queryError?.summary ?? null);
   readonly statusMessage = computed(() => this.state().statusMessage);
   readonly lastQueryElapsedMs = computed(() => this.state().lastQueryElapsedMs);
-  readonly queryHistory = computed(() => this.state().queryHistory);
   readonly effectiveSql = computed(() => this.state().effectiveSql);
   readonly activeSortColumn = computed(() => this.state().activeSortColumn);
   readonly activeSortDirection = computed(() => this.state().activeSortDirection);
@@ -167,12 +165,8 @@ export class QueryService {
       this.fileService.setOpenedFile(opened);
       this.perf.end("fileLoad");
 
-      const nextHistory = this.computeNextHistory(this.state().queryHistory, previewQuery);
-      this.persistHistory(nextHistory);
-
       this.patch({
         query: previewQuery,
-        queryHistory: nextHistory,
         queryError: null,
         statusMessage: "CSV registered. Preparing initial preview query...",
       });
@@ -225,11 +219,7 @@ export class QueryService {
       return;
     }
 
-    const nextHistory = this.computeNextHistory(this.state().queryHistory, sql);
-    this.persistHistory(nextHistory);
-
     this.patch({
-      queryHistory: nextHistory,
       activeSortColumn: null,
       activeSortDirection: null,
     });
@@ -251,12 +241,9 @@ export class QueryService {
 
     const baseSql = this.state().effectiveSql ?? this.state().query;
     const sql = this.sqlGenerator.withOrderBy(baseSql, columnName, direction, tableName);
-    const nextHistory = this.computeNextHistory(this.state().queryHistory, sql);
-    this.persistHistory(nextHistory);
 
     this.patch({
       query: sql,
-      queryHistory: nextHistory,
       queryError: null,
     });
 
@@ -478,6 +465,8 @@ export class QueryService {
         effectiveSql: options.sql,
       }));
 
+      this.queryExecutionEvents.emitSuccessfulExecution(options.sql);
+
       this.clearSlowLoadTimer();
     } catch (error) {
       this.perf.end("queryRoundTrip");
@@ -572,6 +561,8 @@ export class QueryService {
         lastQueryElapsedMs: chunk.elapsedMs,
         effectiveSql: sql,
       }));
+
+      this.queryExecutionEvents.emitSuccessfulExecution(sql);
 
       this.clearSlowLoadTimer();
     } catch (error) {
@@ -832,44 +823,6 @@ export class QueryService {
     if (this.slowLoadTimer !== null) {
       clearTimeout(this.slowLoadTimer);
       this.slowLoadTimer = null;
-    }
-  }
-
-  private computeNextHistory(existing: string[], sql: string): string[] {
-    const normalized = sql.trim();
-    if (!normalized) {
-      return existing;
-    }
-
-    return [normalized, ...existing.filter((entry) => entry !== normalized)].slice(0, 20);
-  }
-
-  private loadHistory(): string[] {
-    if (typeof localStorage === "undefined") {
-      return [];
-    }
-
-    try {
-      const parsed = JSON.parse(localStorage.getItem(this.historyStorageKey) ?? "[]");
-      if (!Array.isArray(parsed)) {
-        return [];
-      }
-
-      return parsed.filter((item): item is string => typeof item === "string").slice(0, 20);
-    } catch {
-      return [];
-    }
-  }
-
-  private persistHistory(history: string[]): void {
-    if (typeof localStorage === "undefined") {
-      return;
-    }
-
-    try {
-      localStorage.setItem(this.historyStorageKey, JSON.stringify(history));
-    } catch {
-      // Ignore storage write failures in restricted environments.
     }
   }
 

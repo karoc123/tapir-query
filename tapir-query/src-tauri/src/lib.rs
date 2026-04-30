@@ -52,6 +52,8 @@ pub fn run() {
             commands::csv_commands::start_query_session,
             commands::csv_commands::read_query_session_chunk,
             commands::csv_commands::close_query_session,
+            commands::csv_commands::load_query_history,
+            commands::csv_commands::save_query_history,
             commands::csv_commands::export_csv,
             commands::csv_commands::export_rows
         ])

@@ -9,10 +9,12 @@ import {
   ExportCsvResponse,
   ExportRowsRequest,
   OpenFileResponse,
+  QueryHistoryResponse,
   QuerySessionResponse,
   QueryChunk,
   ReadQuerySessionChunkRequest,
   RunColumnProfileMetricRequest,
+  SaveQueryHistoryRequest,
   StartQuerySessionRequest,
 } from "./tauri-contracts";
 import { LogService } from "./log.service";
@@ -71,6 +73,16 @@ export class TauriBridgeService {
 
   exportRows(payload: ExportRowsRequest): Promise<ExportCsvResponse> {
     return this.invokeWithLogging<ExportCsvResponse>("export_rows", {
+      request: payload,
+    });
+  }
+
+  loadQueryHistory(): Promise<QueryHistoryResponse> {
+    return this.invokeWithLogging<QueryHistoryResponse>("load_query_history");
+  }
+
+  saveQueryHistory(payload: SaveQueryHistoryRequest): Promise<QueryHistoryResponse> {
+    return this.invokeWithLogging<QueryHistoryResponse>("save_query_history", {
       request: payload,
     });
   }

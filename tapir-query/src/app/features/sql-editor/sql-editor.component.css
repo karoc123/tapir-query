@@ -1,6 +1,184 @@
+.sql-editor-shell {
+  width: 100%;
+  position: relative;
+  height: 100%;
+  min-height: var(--tapir-sql-min-height, 5.35rem);
+}
+
+.sql-input-shell {
+  position: relative;
+  height: 100%;
+  min-height: inherit;
+}
+
+.sql-action-stack {
+  position: absolute;
+  top: 0.42rem;
+  right: 0.42rem;
+  display: grid;
+  gap: 0.3rem;
+  z-index: 36;
+}
+
+.history-trigger {
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 1px solid var(--tapir-border);
+  border-radius: 0.62rem;
+  background: color-mix(in srgb, var(--tapir-surface-alt) 82%, var(--tapir-accent) 18%);
+  color: var(--tapir-text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.execute-trigger {
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 1px solid color-mix(in srgb, var(--tapir-fab-bg) 72%, var(--tapir-border));
+  border-radius: 0.62rem;
+  background: var(--tapir-fab-bg);
+  color: var(--tapir-fab-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--tapir-fab-bg) 26%, transparent);
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.history-trigger:hover {
+  border-color: var(--tapir-border-strong);
+  background: color-mix(in srgb, var(--tapir-accent) 22%, var(--tapir-surface-alt));
+}
+
+.execute-trigger:hover {
+  border-color: color-mix(in srgb, var(--tapir-fab-hover-bg) 66%, var(--tapir-border));
+  background: var(--tapir-fab-hover-bg);
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--tapir-fab-bg) 32%, transparent);
+}
+
+.history-trigger:focus-visible {
+  outline: 1px solid var(--tapir-accent);
+  outline-offset: 1px;
+}
+
+.execute-trigger:focus-visible {
+  outline: 1px solid var(--tapir-accent);
+  outline-offset: 1px;
+}
+
+.history-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.execute-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+  box-shadow: none;
+}
+
+.history-menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  width: min(34rem, 82vw);
+  max-height: 15rem;
+  overflow-y: auto;
+  border: 1px solid color-mix(in srgb, var(--tapir-border) 86%, transparent);
+  border-radius: 0.72rem;
+  background: color-mix(in srgb, var(--tapir-surface) 96%, transparent);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--tapir-panel-shadow) 72%, transparent);
+  z-index: 40;
+  padding: 0.28rem;
+}
+
+.history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.12rem;
+}
+
+.history-item {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 0.52rem;
+  background: transparent;
+  padding: 0.42rem 0.45rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+
+.history-item:hover {
+  border-color: color-mix(in srgb, var(--tapir-border) 66%, transparent);
+  background: color-mix(in srgb, var(--tapir-accent) 8%, var(--tapir-surface-alt));
+}
+
+.history-item.active {
+  border-color: color-mix(in srgb, var(--tapir-accent) 52%, var(--tapir-border));
+  background: color-mix(in srgb, var(--tapir-accent) 14%, var(--tapir-surface-alt));
+}
+
+.history-item:focus-visible {
+  outline: 1px solid var(--tapir-accent);
+  outline-offset: 1px;
+}
+
+.history-sql {
+  font-family: "IBM Plex Mono", "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  color: var(--tapir-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-time {
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tapir-text-muted);
+  white-space: nowrap;
+}
+
+.history-empty {
+  margin: 0;
+  padding: 0.46rem 0.45rem;
+  font-size: 0.72rem;
+  color: var(--tapir-text-muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 .sql-input {
   width: 100%;
-  min-height: 3.5rem;
+  min-height: var(--tapir-sql-min-height, 5.35rem);
   max-height: 11.5rem;
   border: 1px solid var(--tapir-border);
   border-radius: 0.75rem;
@@ -35,7 +213,7 @@
 }
 
 :host ::ng-deep .sql-input .cm-scroller {
-  min-height: 3.5rem;
+  min-height: var(--tapir-sql-min-height, 5.35rem);
   max-height: 11.5rem;
   overflow: auto;
 }
@@ -49,7 +227,7 @@
 }
 
 :host ::ng-deep .sql-input .cm-content {
-  padding: 0.55rem 0.6rem;
+  padding: 0.55rem 2.9rem 0.55rem 0.6rem;
 }
 
 :host ::ng-deep .sql-input .cm-tooltip-autocomplete ul {
@@ -58,4 +236,10 @@
 
 :host ::ng-deep .sql-input .cm-tooltip {
   z-index: 999;
+}
+
+@media (max-width: 680px) {
+  .history-menu {
+    width: min(92vw, 28rem);
+  }
 }

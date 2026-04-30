@@ -1,29 +1,73 @@
 import { TestBed } from "@angular/core/testing";
+import { HistoryService } from "./history.service";
+import { QueryExecutionEventsService } from "./query-execution-events.service";
 import { QueryService } from "./query.service";
 import { TauriBridgeService } from "../infrastructure/tauri-bridge.service";
 import { MockTauriService } from "../testing/mock-tauri.service";
 
 describe("QueryService", () => {
-  const bridgeMock = new MockTauriService();
+  let bridgeMock: MockTauriService;
+  let queryExecutionEvents: QueryExecutionEventsService;
+
+  function flushEffects(): void {
+    const maybeFlushEffects = (TestBed as unknown as { flushEffects?: () => void }).flushEffects;
+    if (typeof maybeFlushEffects === "function") {
+      maybeFlushEffects();
+    }
+  }
 
   beforeEach(() => {
+    bridgeMock = new MockTauriService();
+    queryExecutionEvents = new QueryExecutionEventsService();
+
     TestBed.configureTestingModule({
-      providers: [{ provide: TauriBridgeService, useValue: bridgeMock }],
+      providers: [
+        { provide: TauriBridgeService, useValue: bridgeMock },
+        { provide: QueryExecutionEventsService, useValue: queryExecutionEvents },
+      ],
     });
   });
 
   afterEach(() => {
-    bridgeMock.reset();
-    localStorage.removeItem("tapir.queryHistory.v1");
+    TestBed.resetTestingModule();
   });
 
-  it("persists successful queries in history", async () => {
+  it("captures successful preview query in persistent history service", async () => {
     const service = TestBed.inject(QueryService);
+    const historyService = TestBed.inject(HistoryService);
 
     await service.openFile("/tmp/transactions.csv");
+    flushEffects();
+    await Promise.resolve();
 
-    expect(service.queryHistory()[0]).toBe("SELECT * FROM transactions LIMIT 1000");
-    expect(JSON.parse(localStorage.getItem("tapir.queryHistory.v1") ?? "[]")[0]).toBe("SELECT * FROM transactions LIMIT 1000");
+    expect(historyService.entries()[0]).toEqual(
+      expect.objectContaining({
+        sql: "SELECT * FROM transactions LIMIT 1000",
+      }),
+    );
+    expect(bridgeMock.saveQueryHistoryCalls[0]?.entries[0]?.sql).toBe("SELECT * FROM transactions LIMIT 1000");
+  });
+
+  it("does not capture failed queries in history", async () => {
+    const service = TestBed.inject(QueryService);
+    const historyService = TestBed.inject(HistoryService);
+
+    await service.openFile("/tmp/transactions.csv");
+    flushEffects();
+    await Promise.resolve();
+
+    const baselineEntries = historyService.entries().length;
+    bridgeMock.executeQueryImpl = async () => {
+      throw new Error("sql error: syntax error at or near 'FROM'");
+    };
+
+    service.updateQuery("SELECT FROM");
+    await service.runQuery();
+    flushEffects();
+    await Promise.resolve();
+
+    expect(historyService.entries().length).toBe(baselineEntries);
+    expect(historyService.entries().some((entry) => entry.sql === "SELECT FROM")).toBe(false);
   });
 
   it("uses direct preview execution when opening a file", async () => {

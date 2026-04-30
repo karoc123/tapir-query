@@ -229,12 +229,12 @@ impl DuckDbEngine {
              SELECT normalized_value, frequency, unique_count FROM ranked"
         );
 
-        let mut statement = connection
-            .prepare(&top_values_sql)
-            .map_err(|error| AppError::Sql(format!("failed to prepare top-value query: {error}")))?;
-        let mut cursor = statement
-            .query([])
-            .map_err(|error| AppError::Sql(format!("failed to execute top-value query: {error}")))?;
+        let mut statement = connection.prepare(&top_values_sql).map_err(|error| {
+            AppError::Sql(format!("failed to prepare top-value query: {error}"))
+        })?;
+        let mut cursor = statement.query([]).map_err(|error| {
+            AppError::Sql(format!("failed to execute top-value query: {error}"))
+        })?;
 
         let mut top_values = Vec::new();
         let mut unique_value_count: Option<usize> = None;
@@ -242,15 +242,15 @@ impl DuckDbEngine {
             .next()
             .map_err(|error| AppError::Sql(format!("failed to iterate top-value rows: {error}")))?
         {
-            let raw_value: String = row
-                .get(0)
-                .map_err(|error| AppError::Sql(format!("failed to read top-value label: {error}")))?;
-            let frequency: i64 = row
-                .get(1)
-                .map_err(|error| AppError::Sql(format!("failed to read top-value frequency: {error}")))?;
-            let unique_count: i64 = row
-                .get(2)
-                .map_err(|error| AppError::Sql(format!("failed to read unique value count: {error}")))?;
+            let raw_value: String = row.get(0).map_err(|error| {
+                AppError::Sql(format!("failed to read top-value label: {error}"))
+            })?;
+            let frequency: i64 = row.get(1).map_err(|error| {
+                AppError::Sql(format!("failed to read top-value frequency: {error}"))
+            })?;
+            let unique_count: i64 = row.get(2).map_err(|error| {
+                AppError::Sql(format!("failed to read unique value count: {error}"))
+            })?;
 
             if unique_value_count.is_none() {
                 unique_value_count = Some(unique_count.max(0) as usize);
@@ -290,7 +290,9 @@ impl DuckDbEngine {
             .query_row(&completeness_sql, [], |row| {
                 Ok((row.get(0)?, row.get(1)?, row.get(2)?))
             })
-            .map_err(|error| AppError::Sql(format!("failed to compute completeness audit: {error}")))?;
+            .map_err(|error| {
+                AppError::Sql(format!("failed to compute completeness audit: {error}"))
+            })?;
 
         let total_rows = total_rows.max(0) as usize;
         let populated = populated.max(0) as usize;
@@ -332,7 +334,12 @@ impl DuckDbEngine {
              FROM lengths"
         );
 
-        let (non_empty_rows, min_length, max_length, average_length): (i64, Option<i64>, Option<i64>, Option<f64>) = connection
+        let (non_empty_rows, min_length, max_length, average_length): (
+            i64,
+            Option<i64>,
+            Option<i64>,
+            Option<f64>,
+        ) = connection
             .query_row(&stats_sql, [], |row| {
                 Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
             })
@@ -356,12 +363,12 @@ impl DuckDbEngine {
              ORDER BY bucket_order ASC"
         );
 
-        let mut statement = connection
-            .prepare(&bucket_sql)
-            .map_err(|error| AppError::Sql(format!("failed to prepare length bucket query: {error}")))?;
-        let mut cursor = statement
-            .query([])
-            .map_err(|error| AppError::Sql(format!("failed to execute length bucket query: {error}")))?;
+        let mut statement = connection.prepare(&bucket_sql).map_err(|error| {
+            AppError::Sql(format!("failed to prepare length bucket query: {error}"))
+        })?;
+        let mut cursor = statement.query([]).map_err(|error| {
+            AppError::Sql(format!("failed to execute length bucket query: {error}"))
+        })?;
 
         let mut frequencies_by_order = HashMap::<i64, usize>::new();
         while let Some(row) = cursor
@@ -371,23 +378,25 @@ impl DuckDbEngine {
             let order: i64 = row
                 .get(0)
                 .map_err(|error| AppError::Sql(format!("failed to read bucket order: {error}")))?;
-            let frequency: i64 = row
-                .get(1)
-                .map_err(|error| AppError::Sql(format!("failed to read bucket frequency: {error}")))?;
+            let frequency: i64 = row.get(1).map_err(|error| {
+                AppError::Sql(format!("failed to read bucket frequency: {error}"))
+            })?;
             frequencies_by_order.insert(order, frequency.max(0) as usize);
         }
 
         let buckets = LENGTH_BUCKETS
             .iter()
             .enumerate()
-            .map(|(index, (label, min_inclusive, max_inclusive))| StringLengthBucket {
-                label: String::from(*label),
-                min_inclusive: *min_inclusive,
-                max_inclusive: *max_inclusive,
-                frequency: *frequencies_by_order
-                    .get(&((index + 1) as i64))
-                    .unwrap_or(&0),
-            })
+            .map(
+                |(index, (label, min_inclusive, max_inclusive))| StringLengthBucket {
+                    label: String::from(*label),
+                    min_inclusive: *min_inclusive,
+                    max_inclusive: *max_inclusive,
+                    frequency: *frequencies_by_order
+                        .get(&((index + 1) as i64))
+                        .unwrap_or(&0),
+                },
+            )
             .collect::<Vec<_>>();
 
         Ok(StringLengthHistogram {
@@ -398,7 +407,6 @@ impl DuckDbEngine {
             buckets,
         })
     }
-
 }
 
 impl CsvQueryEngine for DuckDbEngine {
@@ -738,7 +746,9 @@ impl CsvQueryEngine for DuckDbEngine {
             // Keep a conservative DuckDB thread count per profiling task to reduce contention.
             connection
                 .execute_batch("PRAGMA threads=1;")
-                .map_err(|error| AppError::Sql(format!("failed to set profiling thread limit: {error}")))?;
+                .map_err(|error| {
+                    AppError::Sql(format!("failed to set profiling thread limit: {error}"))
+                })?;
 
             let mut resolved_total_rows = total_rows_hint.unwrap_or(0);
 
@@ -758,14 +768,20 @@ impl CsvQueryEngine for DuckDbEngine {
                     if resolved_total_rows == 0 {
                         resolved_total_rows = self.count_total_rows(connection, &normalized_sql)?;
                     }
-                    let (unique_value_count, top_values) =
-                        self.query_cardinality_metric(connection, &normalized_sql, normalized_column)?;
+                    let (unique_value_count, top_values) = self.query_cardinality_metric(
+                        connection,
+                        &normalized_sql,
+                        normalized_column,
+                    )?;
                     result.unique_value_count = Some(unique_value_count);
                     result.cardinality_top_values = Some(top_values);
                 }
                 ColumnProfileMetricKind::CompletenessAudit => {
-                    let (completeness, total_rows) =
-                        self.query_completeness_metric(connection, &normalized_sql, normalized_column)?;
+                    let (completeness, total_rows) = self.query_completeness_metric(
+                        connection,
+                        &normalized_sql,
+                        normalized_column,
+                    )?;
                     resolved_total_rows = total_rows;
                     result.completeness = Some(completeness);
                 }
@@ -952,9 +968,7 @@ mod tests {
             let result = describe_engine
                 .describe_table(&describe_registry, &describe_table_name)
                 .map(|_| ());
-            describe_tx
-                .send(result)
-                .expect("send describe result");
+            describe_tx.send(result).expect("send describe result");
         });
 
         describe_rx
@@ -1030,7 +1044,8 @@ mod tests {
 
     #[test]
     fn run_column_profile_metric_returns_exact_cardinality_and_completeness() {
-        let csv_path = make_temp_csv("partner,iban\nACME,DE123\nACME,DE123\nBETA,DE999\n,DE999\n   ,\n");
+        let csv_path =
+            make_temp_csv("partner,iban\nACME,DE123\nACME,DE123\nBETA,DE999\n,DE999\n   ,\n");
         let engine = DuckDbEngine::new(1);
         let mut registered = HashMap::new();
 
@@ -1059,9 +1074,9 @@ mod tests {
         let top_values = cardinality
             .cardinality_top_values
             .expect("cardinality payload");
-        assert!(top_values.iter().any(|entry| {
-            entry.value == "ACME" && entry.frequency == 2
-        }));
+        assert!(top_values
+            .iter()
+            .any(|entry| { entry.value == "ACME" && entry.frequency == 2 }));
         let empty_frequency = top_values
             .iter()
             .filter(|entry| entry.value == "<EMPTY>" || entry.value == "<NULL>")
@@ -1090,7 +1105,8 @@ mod tests {
 
     #[test]
     fn run_column_profile_metric_returns_exact_string_length_histogram() {
-        let csv_path = make_temp_csv("partner,iban\nACME,DE123\nACME,DE123\nBETA,DE999\n,DE999\n   ,\n");
+        let csv_path =
+            make_temp_csv("partner,iban\nACME,DE123\nACME,DE123\nBETA,DE999\n,DE999\n   ,\n");
         let engine = DuckDbEngine::new(1);
         let mut registered = HashMap::new();
 

@@ -99,6 +99,19 @@ export interface QueryChunk {
   elapsedMs: number;
 }
 
+export interface QueryHistoryEntry {
+  sql: string;
+  executedAtUnixMs: number;
+}
+
+export interface QueryHistoryResponse {
+  entries: QueryHistoryEntry[];
+}
+
+export interface SaveQueryHistoryRequest {
+  entries: QueryHistoryEntry[];
+}
+
 export interface ExportCsvRequest {
   sql: string;
   outputPath: string;

@@ -7,10 +7,12 @@ import {
   ExportCsvResponse,
   ExportRowsRequest,
   OpenFileResponse,
+  QueryHistoryResponse,
   QuerySessionResponse,
   QueryChunk,
   ReadQuerySessionChunkRequest,
   RunColumnProfileMetricRequest,
+  SaveQueryHistoryRequest,
   StartQuerySessionRequest,
 } from "../infrastructure/tauri-contracts";
 
@@ -23,6 +25,7 @@ export class MockTauriService {
   closeQuerySessionCalls: CloseQuerySessionRequest[] = [];
   exportCsvCalls: ExportCsvRequest[] = [];
   exportRowsCalls: ExportRowsRequest[] = [];
+  saveQueryHistoryCalls: SaveQueryHistoryRequest[] = [];
   runColumnProfileMetricCalls: RunColumnProfileMetricRequest[] = [];
   runColumnProfileMetricResults: ColumnProfileMetricResult[] = [];
 
@@ -62,6 +65,10 @@ export class MockTauriService {
     rowsWritten: 1,
   };
 
+  queryHistoryResult: QueryHistoryResponse = {
+    entries: [],
+  };
+
   runColumnProfileMetricResult: ColumnProfileMetricResult = {
     columnName: "currency",
     metric: "completenessAudit",
@@ -77,6 +84,7 @@ export class MockTauriService {
     stringLengthHistogram: null,
   };
 
+  executeQueryImpl: ((payload: ExecuteQueryRequest) => Promise<QueryChunk>) | null = null;
   runColumnProfileMetricImpl: ((payload: RunColumnProfileMetricRequest) => Promise<ColumnProfileMetricResult>) | null = null;
 
   async openFile(filePath: string): Promise<OpenFileResponse> {
@@ -86,6 +94,11 @@ export class MockTauriService {
 
   async executeQuery(payload: ExecuteQueryRequest): Promise<QueryChunk> {
     this.executeQueryCalls.push(payload);
+
+    if (this.executeQueryImpl !== null) {
+      return await this.executeQueryImpl(payload);
+    }
+
     const nextResult = this.executeQueryResults.shift();
     if (nextResult) {
       return nextResult;
@@ -119,6 +132,18 @@ export class MockTauriService {
     return this.exportResult;
   }
 
+  async loadQueryHistory(): Promise<QueryHistoryResponse> {
+    return this.queryHistoryResult;
+  }
+
+  async saveQueryHistory(payload: SaveQueryHistoryRequest): Promise<QueryHistoryResponse> {
+    this.saveQueryHistoryCalls.push(payload);
+    this.queryHistoryResult = {
+      entries: payload.entries,
+    };
+    return this.queryHistoryResult;
+  }
+
   async runColumnProfileMetric(payload: RunColumnProfileMetricRequest): Promise<ColumnProfileMetricResult> {
     this.runColumnProfileMetricCalls.push(payload);
 
@@ -143,8 +168,13 @@ export class MockTauriService {
     this.closeQuerySessionCalls = [];
     this.exportCsvCalls = [];
     this.exportRowsCalls = [];
+    this.saveQueryHistoryCalls = [];
     this.runColumnProfileMetricCalls = [];
     this.runColumnProfileMetricResults = [];
+    this.executeQueryImpl = null;
     this.runColumnProfileMetricImpl = null;
+    this.queryHistoryResult = {
+      entries: [],
+    };
   }
 }

@@ -15,9 +15,9 @@ Core objectives:
 
 ```mermaid
 flowchart LR
-  UI[Angular 21 UI<br/>Standalone Components + Signals] --> Domain[Domain Services<br/>FileService / QueryService / DatasetMetricsService / DataAnalysisPluginService]
+  UI[Angular 21 UI<br/>Standalone Components + Signals] --> Domain[Domain Services<br/>FileService / QueryService / HistoryService / DatasetMetricsService / DataAnalysisPluginService]
   Domain --> Bridge[TauriBridgeService<br/>Typed invoke wrapper]
-  Bridge --> Cmd[Tauri Commands<br/>open_file / execute_query / run_column_profile_metric / start_query_session / read_query_session_chunk / close_query_session / export_csv / export_rows]
+  Bridge --> Cmd[Tauri Commands<br/>open_file / execute_query / run_column_profile_metric / start_query_session / read_query_session_chunk / close_query_session / load_query_history / save_query_history / export_csv / export_rows]
   Cmd --> Svc[CsvQueryService]
   Svc --> Engine[DuckDbEngine]
   Engine --> DuckDB[(Embedded DuckDB)]
@@ -90,6 +90,8 @@ src-tauri/src/
 - `start_query_session`
 - `read_query_session_chunk`
 - `close_query_session`
+- `load_query_history`
+- `save_query_history`
 - `export_csv`
 - `export_rows`
 
@@ -135,8 +137,12 @@ src/app/
   - Current file path, table name, schema, and file size metadata.
 
 - `QueryService`
-  - Query text, result rows/columns, status messaging, query errors, history, sort state.
+  - Query text, result rows/columns, status messaging, query errors, and sort state.
   - Owns request token invalidation, load hints, viewport prefetch flow, and export triggers.
+
+- `HistoryService`
+  - Owns persistent query history (load/save/cleanup) with move-to-top dedupe and 50-entry cap.
+  - Subscribes to successful query execution events and stores history via backend commands.
 
 - `DatasetMetricsService`
   - Optional background filtered and total count queries.
@@ -217,6 +223,7 @@ Current status:
 - Backend normalizes projection cells to `VARCHAR` or null.
 - Pagination fields: `limit`, `offset`, `nextOffset`.
 - Timing field: `elapsedMs`.
+- Query history entries use `{ sql, executedAtUnixMs }` across Rust and TypeScript.
 - Profiling contracts include:
   - Metric discriminator (`cardinalityTopValues`, `completenessAudit`, `stringLengthHistogram`).
   - Incremental single-metric payloads per column.
@@ -243,6 +250,7 @@ Current status:
 - CSV registry and session maps are mutex-protected.
 - Sessions are cleared when a new file is opened.
 - Session lifecycle supports explicit close and global clear.
+- Query history is stored as JSON in app-data (`query-history.json`) via async file I/O commands.
 - No hard TTL/cap for session map yet.
 
 ## 8. Security Architecture
