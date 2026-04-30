@@ -109,7 +109,7 @@ describe("QueryService", () => {
     await service.openFile("/tmp/transactions.csv");
     service.applyFilterTemplate("currency");
 
-    expect(service.query()).toBe('SELECT * FROM transactions WHERE "currency" = \'value\' LIMIT 1000');
+    expect(service.query()).toBe("SELECT * FROM transactions WHERE \"currency\" = 'value' LIMIT 1000");
     expect(bridgeMock.startQuerySessionCalls.length).toBe(1);
   });
 });

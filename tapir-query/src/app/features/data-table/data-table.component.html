@@ -1,8 +1,6 @@
 <section class="table-shell">
   @if (columns().length === 0) {
-    <div class="table-empty">
-      Open a CSV file and execute a query to render rows.
-    </div>
+    <div class="table-empty">Open a CSV file and execute a query to render rows.</div>
   } @else {
     <div class="table-header" [style.gridTemplateColumns]="gridTemplateColumns()">
       @for (column of columns(); track column) {
@@ -36,12 +34,7 @@
               </svg>
             </button>
 
-            <button
-              type="button"
-              class="icon-control filter-control"
-              [title]="'Insert filter for ' + column"
-              (click)="requestFilter(column)"
-            >
+            <button type="button" class="icon-control filter-control" [title]="'Insert filter for ' + column" (click)="requestFilter(column)">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M4 5h16l-6 7v5l-4 2v-7Z" />
               </svg>
@@ -51,19 +44,8 @@
       }
     </div>
 
-    <cdk-virtual-scroll-viewport
-      class="table-viewport"
-      [itemSize]="38"
-      minBufferPx="300"
-      maxBufferPx="800"
-      (scrolledIndexChange)="onViewportIndexChanged($event)"
-    >
-      <div
-        class="table-row"
-        [style.gridTemplateColumns]="gridTemplateColumns()"
-        *cdkVirtualFor="let rowIndex of rowIndexes(); trackBy: trackByAbsoluteIndex"
-        [class.loading-row]="loading()"
-      >
+    <cdk-virtual-scroll-viewport class="table-viewport" [itemSize]="38" minBufferPx="300" maxBufferPx="800" (scrolledIndexChange)="onViewportIndexChanged($event)">
+      <div class="table-row" [style.gridTemplateColumns]="gridTemplateColumns()" *cdkVirtualFor="let rowIndex of rowIndexes(); trackBy: trackByAbsoluteIndex" [class.loading-row]="loading()">
         @let row = rowForIndex(rowIndex);
         @for (column of columns(); track column) {
           <span class="table-cell" [title]="row?.[column] ?? ''">

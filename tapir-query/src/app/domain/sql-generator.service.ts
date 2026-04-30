@@ -21,17 +21,9 @@ export class SqlGeneratorService {
     const { core, hadTerminator } = this.splitSqlTerminator(normalized);
     const withoutTopLevelOrderBy = this.removeTopLevelOrderByClause(core);
     const positions = this.findTopLevelClauses(withoutTopLevelOrderBy);
-    const insertionPoint = this.firstClauseIndex([
-      positions.limit,
-      positions.offset,
-      positions.fetch,
-    ], withoutTopLevelOrderBy.length);
+    const insertionPoint = this.firstClauseIndex([positions.limit, positions.offset, positions.fetch], withoutTopLevelOrderBy.length);
 
-    const nextSql = this.insertClause(
-      withoutTopLevelOrderBy,
-      `ORDER BY ${this.escapeIdentifier(columnName)} ${direction.toUpperCase()}`,
-      insertionPoint,
-    );
+    const nextSql = this.insertClause(withoutTopLevelOrderBy, `ORDER BY ${this.escapeIdentifier(columnName)} ${direction.toUpperCase()}`, insertionPoint);
 
     return this.withOptionalTerminator(nextSql, hadTerminator);
   }
@@ -43,20 +35,13 @@ export class SqlGeneratorService {
     const predicate = `${this.escapeIdentifier(columnName)} = 'value'`;
 
     if (positions.where !== null) {
-      const whereClauseEnd = this.firstClauseAfter(
-        positions.where,
-        [positions.groupBy, positions.having, positions.orderBy, positions.limit, positions.offset, positions.fetch],
-        core.length,
-      );
+      const whereClauseEnd = this.firstClauseAfter(positions.where, [positions.groupBy, positions.having, positions.orderBy, positions.limit, positions.offset, positions.fetch], core.length);
       const currentWhereClause = core.slice(positions.where, whereClauseEnd).trimEnd();
       const nextSql = this.replaceSegment(core, positions.where, whereClauseEnd, `${currentWhereClause} AND ${predicate}`);
       return this.withOptionalTerminator(nextSql, hadTerminator);
     }
 
-    const insertionPoint = this.firstClauseIndex(
-      [positions.groupBy, positions.having, positions.orderBy, positions.limit, positions.offset, positions.fetch],
-      core.length,
-    );
+    const insertionPoint = this.firstClauseIndex([positions.groupBy, positions.having, positions.orderBy, positions.limit, positions.offset, positions.fetch], core.length);
     const nextSql = this.insertClause(core, `WHERE ${predicate}`, insertionPoint);
     return this.withOptionalTerminator(nextSql, hadTerminator);
   }
@@ -87,11 +72,7 @@ export class SqlGeneratorService {
       return sql;
     }
 
-    const orderByEnd = this.firstClauseAfter(
-      positions.orderBy,
-      [positions.limit, positions.offset, positions.fetch],
-      sql.length,
-    );
+    const orderByEnd = this.firstClauseAfter(positions.orderBy, [positions.limit, positions.offset, positions.fetch], sql.length);
 
     return this.replaceSegment(sql, positions.orderBy, orderByEnd, "");
   }

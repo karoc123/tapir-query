@@ -39,9 +39,7 @@ export class DataTableComponent {
 
   readonly rowCountLabel = computed(() => `${this.rows().length.toLocaleString()} rows`);
 
-  readonly rowIndexes = computed(() =>
-    Array.from({ length: this.totalRows() }, (_, index) => index),
-  );
+  readonly rowIndexes = computed(() => Array.from({ length: this.totalRows() }, (_, index) => index));
 
   constructor() {
     afterRenderEffect(() => {
@@ -64,8 +62,7 @@ export class DataTableComponent {
   }
 
   toggleSort(column: string): void {
-    const nextDirection: SortDirection =
-      this.sortColumn() === column && this.sortDirection() === "asc" ? "desc" : "asc";
+    const nextDirection: SortDirection = this.sortColumn() === column && this.sortDirection() === "asc" ? "desc" : "asc";
 
     this.requestSort(column, nextDirection);
   }
