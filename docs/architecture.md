@@ -1,8 +1,8 @@
-# Architecture: Tapir Query
+# Architecture: Tapir:Query
 
 ## 1. Scope and Goals
 
-Tapir Query is a desktop-only, local-first analytics tool for CSV exploration.
+Tapir:Query is a desktop-only, local-first analytics tool for CSV exploration.
 
 Primary goals:
 
@@ -16,12 +16,12 @@ Primary goals:
 ```mermaid
 flowchart LR
   UI[Angular 21 UI<br/>Standalone + Signals] --> Domain[Domain Services<br/>FileService / QueryService]
+  Domain --> Metrics[DatasetMetricsService<br/>Background Count Pattern]
   Domain --> Bridge[Tauri Bridge Service<br/>invoke wrapper]
   Bridge --> Cmd[Tauri Commands<br/>open_file / execute_query / start_query_session / read_query_session_chunk / close_query_session / export_csv / export_rows]
   Cmd --> Svc[CsvQueryService]
   Svc --> Engine[DuckDbEngine]
-  Engine --> Pool[DuckDB Connection Pool]
-  Pool --> DuckDB[(Embedded DuckDB)]
+  Engine --> DuckDB[(Embedded DuckDB)]
   DuckDB --> CSV[(Local CSV Files)]
 ```
 
@@ -56,25 +56,21 @@ Command execution model:
 - Blocking work (DuckDB operations, CSV export writes, filesystem-heavy actions) is executed on the blocking runtime via `spawn_blocking`.
 - Command handlers keep orchestration thin and delegate behavior to `CsvQueryService`/engine.
 
-### 3.1 DuckDB Connection Pooling
+### 3.1 DuckDB Connection Strategy
 
-`DuckDbEngine` uses a synchronized pool (`DuckDbPool`) of in-memory DuckDB `Connection` instances.
+`DuckDbEngine` opens an in-memory DuckDB `Connection` per operation.
 
-- Pool size is clamped to at least 1 and currently defaults to 1 in production runtime.
-- On each operation, the service acquires a pooled connection.
-- Registered CSV views are synchronized into that connection context.
-- Connection is returned to the pool by RAII drop (`PooledConnection`).
+- On each operation, active registered CSV views are re-registered into that connection context.
+- This avoids cross-request connection reuse issues seen during incident debugging.
 
-The current default of 1 is intentional because query sessions are materialized into temporary in-memory tables tied to the active connection.
+Session streaming state stores SQL + metadata rather than connection-bound temp table names.
 
 ### 3.2 Registration and Session Optimizations
 
-- Registered CSV views are cached per table/path to avoid repeated `CREATE OR REPLACE VIEW` for unchanged inputs.
-- Stale views are dropped when registry/table context changes.
-- Query sessions materialize SQL once (`start_query_session`) and stream paged rows (`read_query_session_chunk`).
+- Registered CSV views are recreated per operation from the active registry map.
+- Query sessions store normalized SQL, projected columns, and total rows.
+- `read_query_session_chunk` pages directly from stored SQL (`LIMIT/OFFSET`) and preserves column ordering.
 - `read_csv_auto` uses bounded inference sampling (`SAMPLE_SIZE=20000`) to reduce first-open overhead.
-
-This design reduces repeated connection creation overhead during iterative query sessions.
 
 ## 4. Frontend Architecture (Angular 21 + Signals)
 
@@ -83,6 +79,7 @@ Module layout:
 ```text
 src/app/
   domain/
+    dataset-metrics.service.ts
     file.service.ts
     query.service.ts
   infrastructure/
@@ -94,8 +91,8 @@ src/app/
     perf.service.ts
     theme.service.ts
   features/
-    file-picker/
     drag-drop/
+    file-picker/
     sql-editor/
     data-table/
     schema-sidebar/
@@ -114,8 +111,10 @@ State model:
 
 UI behavior:
 
-- Native file picker is the primary ingestion CTA (`@tauri-apps/plugin-dialog`) in empty mode.
+- Empty mode supports CSV ingestion via `DragDropDirective` and native file picker (`@tauri-apps/plugin-dialog`).
 - Loaded mode uses a four-zone layout: action bar, collapsible schema rail, data grid, status bar.
+- Data table filter actions insert SQL filter templates through `SqlGeneratorService`.
+- `DatasetMetricsService` resolves filtered and total row counts through low-priority `COUNT(*)` queries in browser test/runtime contexts; in Tauri runtime this path is disabled as an incident mitigation for WSL WebKit watchdog crashes.
 - SQL errors are parsed into DTOs and rendered inline directly under the editor.
 - Table rendering uses Angular CDK virtual scroll.
 
@@ -156,7 +155,8 @@ Example mapping:
 - Query result rows are serialized as string-or-null cell values.
 - Pagination fields: `limit`, `offset`, `nextOffset`.
 - Engine execution timing is returned as `elapsedMs`.
-- Frontend default path uses session streaming for large result windows and a direct execute path for simple `COUNT(*)` queries.
+- Frontend currently uses a direct execute path for preview, execute, and sort interactions to maximize runtime reliability; session streaming is retained as a fallback-capable implementation but is not the default while incident-level hangs are being mitigated.
+- Status-bar row totals are resolved asynchronously through separate background `COUNT(*)` requests after the main query render path.
 
 ## 6. Observability and Benchmarking
 
@@ -172,7 +172,7 @@ Backend telemetry:
 Diagnostics:
 
 - `LogService` captures IPC errors, drag/drop handling, and state transition breadcrumbs.
-- App shell also logs raw native drag/drop events via Tauri webview event listener.
+- Runtime incident diagnostics correlated app exits with `WebKitWebProcess` watchdog crashes after backend query success on WSL.
 
 ## 7. Streaming and Memory Strategy
 
@@ -184,7 +184,7 @@ Diagnostics:
 
 Decision:
 
-- Tapir Query remains desktop-only (Linux and Windows distribution targets).
+- Tapir:Query remains desktop-only (Linux and Windows distribution targets).
 
 Consequences:
 
