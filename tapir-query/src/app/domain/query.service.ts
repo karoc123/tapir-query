@@ -6,6 +6,7 @@ import { PerfService } from "../infrastructure/perf.service";
 import { TauriBridgeService } from "../infrastructure/tauri-bridge.service";
 import { FileService } from "./file.service";
 import { SqlGeneratorService } from "./sql-generator.service";
+import type { FilterIntent } from "./sql-generator.service";
 
 export type SortDirection = "asc" | "desc";
 
@@ -235,8 +236,7 @@ export class QueryService {
 
     await this.executeSqlDirect(sql, {
       statusOnStart: "Running query...",
-      statusOnFinish: (elapsedMs, loadedRows) =>
-        `Query ready: ${loadedRows.toLocaleString()} rows in ${elapsedMs} ms (direct mode).`,
+      statusOnFinish: (elapsedMs, loadedRows) => `Query ready: ${loadedRows.toLocaleString()} rows in ${elapsedMs} ms (direct mode).`,
     });
   }
 
@@ -268,14 +268,21 @@ export class QueryService {
 
     await this.executeSqlDirect(sql, {
       statusOnStart: `Sorting full dataset by ${columnName} (${direction.toUpperCase()})...`,
-      statusOnFinish: (elapsedMs, loadedRows) =>
-        `Sorted ${loadedRows.toLocaleString()} rows by ${columnName} (${direction.toUpperCase()}) in ${elapsedMs} ms (direct mode).`,
+      statusOnFinish: (elapsedMs, loadedRows) => `Sorted ${loadedRows.toLocaleString()} rows by ${columnName} (${direction.toUpperCase()}) in ${elapsedMs} ms (direct mode).`,
       sortColumn: columnName,
       sortDirection: direction,
     });
   }
 
   applyFilterTemplate(columnName: string): void {
+    this.applyFilterIntent({
+      columnName,
+      value: "value",
+      operator: "equals",
+    });
+  }
+
+  applyFilterIntent(intent: FilterIntent): void {
     const tableName = this.fileService.currentTable();
     if (!tableName) {
       this.patch({
@@ -284,15 +291,15 @@ export class QueryService {
       return;
     }
 
-    const sql = this.sqlGenerator.withFilterTemplate(this.state().query, columnName, tableName);
+    const sql = this.sqlGenerator.withFilterIntent(this.state().query, intent, tableName);
     this.patch({
       query: sql,
       queryError: null,
-      statusMessage: `Filter template added for ${columnName}. Edit value and execute query.`,
+      statusMessage: `Filter added for ${intent.columnName}. Execute query to apply changes.`,
     });
 
-    this.logs.info("query", "Filter template inserted for column", {
-      columnName,
+    this.logs.info("query", "Filter intent merged into SQL", {
+      intent,
     });
   }
 
@@ -500,8 +507,8 @@ export class QueryService {
 
           return `Query ready: ${loadedRows.toLocaleString()} rows in ${elapsedMs} ms (direct fallback).`;
         },
-        sortColumn: options.resetSort ? null : options.sortColumn ?? null,
-        sortDirection: options.resetSort ? null : options.sortDirection ?? null,
+        sortColumn: options.resetSort ? null : (options.sortColumn ?? null),
+        sortDirection: options.resetSort ? null : (options.sortDirection ?? null),
       });
     }
   }
@@ -549,9 +556,7 @@ export class QueryService {
 
       const rows = [...chunk.rows];
       const totalRows = chunk.offset + rows.length + (chunk.nextOffset !== null ? 1 : 0);
-      const statusMessage =
-        options?.statusOnFinish?.(chunk.elapsedMs, rows.length) ??
-        `Query ready: ${rows.length.toLocaleString()} rows in ${chunk.elapsedMs} ms (direct mode).`;
+      const statusMessage = options?.statusOnFinish?.(chunk.elapsedMs, rows.length) ?? `Query ready: ${rows.length.toLocaleString()} rows in ${chunk.elapsedMs} ms (direct mode).`;
 
       this.state.update((current) => ({
         ...current,

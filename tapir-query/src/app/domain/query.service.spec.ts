@@ -166,4 +166,17 @@ describe("QueryService", () => {
     expect(service.query()).toBe("SELECT * FROM transactions WHERE \"currency\" = 'value' LIMIT 1000");
     expect(bridgeMock.startQuerySessionCalls.length).toBe(0);
   });
+
+  it("merges filter intent with operator and value into SQL", async () => {
+    const service = TestBed.inject(QueryService);
+
+    await service.openFile("/tmp/transactions.csv");
+    service.applyFilterIntent({
+      columnName: "currency",
+      value: "EUR",
+      operator: "equals",
+    });
+
+    expect(service.query()).toBe("SELECT * FROM transactions WHERE \"currency\" = 'EUR' LIMIT 1000");
+  });
 });

@@ -100,7 +100,16 @@
         </div>
       </section>
 
-      <footer class="zone-d status-bar">{{ statusMessage() }} • {{ rowStatusLabel() }} • Query took {{ queryElapsedLabel() }}</footer>
+      <footer class="zone-d status-bar">
+        <span>{{ statusMessage() }}</span>
+        <span aria-live="polite">
+          {{ rowStatusLabel() }}
+          @if (totalCountPending()) {
+            <span class="status-loading-indicator" aria-hidden="true"></span>
+          }
+        </span>
+        <span>Query took {{ queryElapsedLabel() }}</span>
+      </footer>
     </section>
   }
 

@@ -1,6 +1,13 @@
 import { Injectable } from "@angular/core";
 
 export type SqlSortDirection = "asc" | "desc";
+export type FilterOperator = "equals" | "notEquals" | "greaterThan" | "greaterOrEqual" | "lessThan" | "lessOrEqual" | "contains" | "startsWith" | "endsWith";
+
+export interface FilterIntent {
+  columnName: string;
+  value: string;
+  operator: FilterOperator;
+}
 
 interface ClausePositions {
   where: number | null;
@@ -29,21 +36,73 @@ export class SqlGeneratorService {
   }
 
   withFilterTemplate(sql: string, columnName: string, fallbackTableName: string): string {
+    return this.withFilterIntent(
+      sql,
+      {
+        columnName,
+        value: "value",
+        operator: "equals",
+      },
+      fallbackTableName,
+    );
+  }
+
+  withFilterIntent(sql: string, intent: FilterIntent, fallbackTableName: string): string {
     const normalized = this.normalizeInputSql(sql, fallbackTableName);
     const { core, hadTerminator } = this.splitSqlTerminator(normalized);
     const positions = this.findTopLevelClauses(core);
-    const predicate = `${this.escapeIdentifier(columnName)} = 'value'`;
+    const predicate = this.buildPredicate(intent);
 
     if (positions.where !== null) {
       const whereClauseEnd = this.firstClauseAfter(positions.where, [positions.groupBy, positions.having, positions.orderBy, positions.limit, positions.offset, positions.fetch], core.length);
       const currentWhereClause = core.slice(positions.where, whereClauseEnd).trimEnd();
-      const nextSql = this.replaceSegment(core, positions.where, whereClauseEnd, `${currentWhereClause} AND ${predicate}`);
+      const nextSql = this.replaceSegment(core, positions.where, whereClauseEnd, `${currentWhereClause} AND (${predicate})`);
       return this.withOptionalTerminator(nextSql, hadTerminator);
     }
 
     const insertionPoint = this.firstClauseIndex([positions.groupBy, positions.having, positions.orderBy, positions.limit, positions.offset, positions.fetch], core.length);
     const nextSql = this.insertClause(core, `WHERE ${predicate}`, insertionPoint);
     return this.withOptionalTerminator(nextSql, hadTerminator);
+  }
+
+  private buildPredicate(intent: FilterIntent): string {
+    const identifier = this.escapeIdentifier(intent.columnName);
+    const normalizedValue = intent.value.trim();
+
+    if (/^null$/i.test(normalizedValue)) {
+      if (intent.operator === "equals") {
+        return `${identifier} IS NULL`;
+      }
+
+      if (intent.operator === "notEquals") {
+        return `${identifier} IS NOT NULL`;
+      }
+    }
+
+    if (intent.operator === "contains") {
+      return `CAST(${identifier} AS VARCHAR) ILIKE '%${this.escapeLikeLiteral(normalizedValue)}%' ESCAPE '\\'`;
+    }
+
+    if (intent.operator === "startsWith") {
+      return `CAST(${identifier} AS VARCHAR) ILIKE '${this.escapeLikeLiteral(normalizedValue)}%' ESCAPE '\\'`;
+    }
+
+    if (intent.operator === "endsWith") {
+      return `CAST(${identifier} AS VARCHAR) ILIKE '%${this.escapeLikeLiteral(normalizedValue)}' ESCAPE '\\'`;
+    }
+
+    const valueLiteral = this.looksNumericLiteral(normalizedValue) ? normalizedValue : `'${this.escapeStringLiteral(normalizedValue)}'`;
+
+    const operatorByIntent: Record<Exclude<FilterOperator, "contains" | "startsWith" | "endsWith">, string> = {
+      equals: "=",
+      notEquals: "!=",
+      greaterThan: ">",
+      greaterOrEqual: ">=",
+      lessThan: "<",
+      lessOrEqual: "<=",
+    };
+
+    return `${identifier} ${operatorByIntent[intent.operator]} ${valueLiteral}`;
   }
 
   private normalizeInputSql(sql: string, fallbackTableName: string): string {
@@ -312,7 +371,22 @@ export class SqlGeneratorService {
     return /[a-z0-9_]/i.test(character);
   }
 
+  private escapeStringLiteral(value: string): string {
+    return value.replace(/'/g, "''");
+  }
+
+  private escapeLikeLiteral(value: string): string {
+    return value.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_").replace(/'/g, "''");
+  }
+
+  private looksNumericLiteral(value: string): boolean {
+    return /^-?\d+(\.\d+)?$/.test(value);
+  }
+
   private escapeIdentifier(identifier: string): string {
-    return `"${identifier.replace(/"/g, '""')}"`;
+    return identifier
+      .split(".")
+      .map((segment) => `"${segment.replace(/"/g, '""')}"`)
+      .join(".");
   }
 }
