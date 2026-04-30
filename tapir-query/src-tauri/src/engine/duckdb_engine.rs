@@ -15,47 +15,35 @@ use tracing::{debug, error, info};
 
 #[derive(Debug, Clone)]
 struct QuerySessionState {
-    table_name: String,
+    sql: String,
     columns: Vec<String>,
     total_rows: usize,
 }
 
 pub struct DuckDbEngine {
-    pool: DuckDbPool,
     session_counter: AtomicU64,
     sessions: Mutex<HashMap<String, QuerySessionState>>,
-    registered_views: Mutex<HashMap<String, String>>,
 }
 
 impl Default for DuckDbEngine {
     fn default() -> Self {
-        // Materialized query sessions are stored in temp tables and require a stable
-        // in-memory connection across requests.
+        // Keep the constructor contract stable for callers while avoiding cross-request
+        // connection reuse.
         Self::new(1)
     }
 }
 
 impl DuckDbEngine {
-    pub fn new(pool_size: usize) -> Self {
+    pub fn new(_pool_size: usize) -> Self {
         Self {
-            pool: DuckDbPool::new(pool_size.max(1)),
             session_counter: AtomicU64::new(1),
             sessions: Mutex::new(HashMap::new()),
-            registered_views: Mutex::new(HashMap::new()),
         }
     }
 
     fn next_session_id(&self) -> String {
         let next = self.session_counter.fetch_add(1, Ordering::Relaxed);
         format!("session-{next}")
-    }
-
-    fn session_table_name(session_id: &str) -> String {
-        let sanitized = session_id
-            .chars()
-            .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
-            .collect::<String>();
-        format!("tapir_result_{sanitized}")
     }
 
     fn lookup_session(&self, session_id: &str) -> EngineResult<QuerySessionState> {
@@ -97,42 +85,12 @@ impl DuckDbEngine {
     where
         F: FnOnce(&Connection) -> EngineResult<T>,
     {
-        let pooled_connection = self.pool.acquire()?;
-        let connection = pooled_connection.as_ref();
+        let connection = Connection::open_in_memory()
+            .map_err(|error| AppError::Sql(format!("failed to open DuckDB: {error}")))?;
 
-        debug!("acquired pooled DuckDB connection");
-
-        let mut registered_views = self
-            .registered_views
-            .lock()
-            .map_err(|_| AppError::State(String::from("failed to lock registered views cache")))?;
-
-        let stale_tables = registered_views
-            .keys()
-            .filter(|table_name| !registered.contains_key(*table_name))
-            .cloned()
-            .collect::<Vec<_>>();
-
-        for table_name in &stale_tables {
-            let drop_sql = sql_builder::build_drop_view_sql(table_name);
-            connection.execute_batch(&drop_sql).map_err(|error| {
-                AppError::Sql(format!(
-                    "failed to remove stale CSV view {}: {error}",
-                    table_name
-                ))
-            })?;
-            registered_views.remove(table_name);
-        }
+        debug!("opened DuckDB connection for operation");
 
         for table in registered.values() {
-            let already_registered = registered_views
-                .get(&table.table_name)
-                .is_some_and(|path| path == &table.file_path);
-
-            if already_registered {
-                continue;
-            }
-
             let register_sql =
                 sql_builder::build_register_view_sql(&table.table_name, &table.file_path);
             connection.execute_batch(&register_sql).map_err(|error| {
@@ -145,11 +103,9 @@ impl DuckDbEngine {
                     table.table_name
                 ))
             })?;
-
-            registered_views.insert(table.table_name.clone(), table.file_path.clone());
         }
 
-        operation(connection)
+        operation(&connection)
     }
 
     fn derive_table_name(
@@ -215,6 +171,7 @@ impl DuckDbEngine {
 
         Ok(columns)
     }
+
 }
 
 impl CsvQueryEngine for DuckDbEngine {
@@ -278,13 +235,16 @@ impl CsvQueryEngine for DuckDbEngine {
 
         self.with_connection(registered, |connection| {
             let start = Instant::now();
+            debug!("execute_query_chunk describing query schema");
             let columns = self.describe_query_schema(connection, sql)?;
 
             let paged_sql =
                 sql_builder::build_paged_select_sql(sql, &columns, bounded_limit + 1, offset);
+            debug!("execute_query_chunk preparing paged query");
             let mut statement = connection
                 .prepare(&paged_sql)
                 .map_err(|error| AppError::Sql(format!("failed to prepare query: {error}")))?;
+            debug!("execute_query_chunk executing paged query");
             let mut cursor = statement
                 .query([])
                 .map_err(|error| AppError::Sql(format!("failed to execute query: {error}")))?;
@@ -313,6 +273,13 @@ impl CsvQueryEngine for DuckDbEngine {
                 rows.truncate(bounded_limit);
             }
 
+            debug!(
+                "execute_query_chunk completed rows={} has_more={} elapsed_ms={}",
+                rows.len(),
+                has_more,
+                start.elapsed().as_millis()
+            );
+
             Ok(QueryChunk {
                 columns: columns.into_iter().map(|column| column.name).collect(),
                 rows,
@@ -335,18 +302,13 @@ impl CsvQueryEngine for DuckDbEngine {
             return Err(AppError::Validation(String::from("query cannot be empty")));
         }
 
+        let normalized_sql = sql.trim().trim_end_matches(';').to_string();
         let session_id = self.next_session_id();
-        let session_table_name = Self::session_table_name(&session_id);
 
         let started = Instant::now();
         let (columns, total_rows) = self.with_connection(registered, |connection| {
-            let columns = self.describe_query_schema(connection, sql)?;
-            let create_sql = sql_builder::build_materialized_session_sql(sql, &session_table_name);
-            connection.execute_batch(&create_sql).map_err(|error| {
-                AppError::Sql(format!("failed to materialize query session: {error}"))
-            })?;
-
-            let count_sql = sql_builder::build_count_table_sql(&session_table_name);
+            let columns = self.describe_query_schema(connection, &normalized_sql)?;
+            let count_sql = sql_builder::build_count_sql(&normalized_sql);
             let total_rows: i64 = connection
                 .query_row(&count_sql, [], |row| row.get(0))
                 .map_err(|error| {
@@ -368,7 +330,7 @@ impl CsvQueryEngine for DuckDbEngine {
             .insert(
                 session_id.clone(),
                 QuerySessionState {
-                    table_name: session_table_name,
+                    sql: normalized_sql,
                     columns: columns.clone(),
                     total_rows,
                 },
@@ -394,9 +356,17 @@ impl CsvQueryEngine for DuckDbEngine {
 
         self.with_connection(registered, |connection| {
             let start = Instant::now();
-            let paged_sql = sql_builder::build_paged_session_sql(
-                &session.table_name,
-                &session.columns,
+            let projection_schema = session
+                .columns
+                .iter()
+                .map(|name| ColumnSchema {
+                    name: name.clone(),
+                    data_type: String::from("VARCHAR"),
+                })
+                .collect::<Vec<_>>();
+            let paged_sql = sql_builder::build_paged_select_sql(
+                &session.sql,
+                &projection_schema,
                 bounded_limit + 1,
                 offset,
             );
@@ -427,19 +397,21 @@ impl CsvQueryEngine for DuckDbEngine {
                 rows.push(map);
             }
 
-            if rows.len() > bounded_limit {
+            let has_more = rows.len() > bounded_limit;
+            if has_more {
                 rows.truncate(bounded_limit);
             }
 
             let row_count = rows.len();
-            let has_more = offset + row_count < session.total_rows;
 
             Ok(QueryChunk {
                 columns: session.columns.clone(),
                 rows,
                 limit: bounded_limit,
                 offset,
-                next_offset: has_more.then_some(offset + row_count),
+                next_offset: has_more
+                    .then_some(offset + row_count)
+                    .filter(|next| *next < session.total_rows),
                 elapsed_ms: start.elapsed().as_millis() as u64,
             })
         })
@@ -447,49 +419,22 @@ impl CsvQueryEngine for DuckDbEngine {
 
     fn close_query_session(
         &self,
-        registered: &HashMap<String, RegisteredCsv>,
+        _registered: &HashMap<String, RegisteredCsv>,
         session_id: &str,
     ) -> EngineResult<bool> {
-        let Some(session) = self.remove_session(session_id)? else {
-            return Ok(false);
-        };
-
-        self.with_connection(registered, |connection| {
-            let drop_sql = sql_builder::build_drop_table_sql(&session.table_name);
-            connection.execute_batch(&drop_sql).map_err(|error| {
-                AppError::Sql(format!("failed to close query session: {error}"))
-            })?;
-            Ok(())
-        })?;
-
-        Ok(true)
+        Ok(self.remove_session(session_id)?.is_some())
     }
 
     fn clear_query_sessions(
         &self,
-        registered: &HashMap<String, RegisteredCsv>,
+        _registered: &HashMap<String, RegisteredCsv>,
     ) -> EngineResult<()> {
-        let sessions = self
-            .sessions
+        self.sessions
             .lock()
             .map_err(|_| AppError::State(String::from("failed to lock query sessions")))?
-            .drain()
-            .map(|(_, session)| session)
-            .collect::<Vec<_>>();
+            .clear();
 
-        if sessions.is_empty() {
-            return Ok(());
-        }
-
-        self.with_connection(registered, move |connection| {
-            for session in &sessions {
-                let drop_sql = sql_builder::build_drop_table_sql(&session.table_name);
-                connection.execute_batch(&drop_sql).map_err(|error| {
-                    AppError::Sql(format!("failed to clear query sessions: {error}"))
-                })?;
-            }
-            Ok(())
-        })
+        Ok(())
     }
 
     fn export_query_to_csv(
@@ -536,76 +481,13 @@ impl CsvQueryEngine for DuckDbEngine {
     }
 }
 
-struct DuckDbPool {
-    max_size: usize,
-    available: Mutex<Vec<Connection>>,
-}
-
-impl DuckDbPool {
-    fn new(max_size: usize) -> Self {
-        Self {
-            max_size,
-            available: Mutex::new(Vec::new()),
-        }
-    }
-
-    fn acquire(&self) -> EngineResult<PooledConnection<'_>> {
-        if let Some(connection) = self
-            .available
-            .lock()
-            .map_err(|_| AppError::State(String::from("failed to lock connection pool")))?
-            .pop()
-        {
-            return Ok(PooledConnection::new(self, connection));
-        }
-
-        let connection = Connection::open_in_memory()
-            .map_err(|error| AppError::Sql(format!("failed to open DuckDB: {error}")))?;
-
-        Ok(PooledConnection::new(self, connection))
-    }
-
-    fn release(&self, connection: Connection) {
-        if let Ok(mut available) = self.available.lock() {
-            if available.len() < self.max_size {
-                available.push(connection);
-            }
-        }
-    }
-}
-
-struct PooledConnection<'a> {
-    pool: &'a DuckDbPool,
-    connection: Option<Connection>,
-}
-
-impl<'a> PooledConnection<'a> {
-    fn new(pool: &'a DuckDbPool, connection: Connection) -> Self {
-        Self {
-            pool,
-            connection: Some(connection),
-        }
-    }
-
-    fn as_ref(&self) -> &Connection {
-        self.connection
-            .as_ref()
-            .expect("pooled connection should always be present while borrowed")
-    }
-}
-
-impl<'a> Drop for PooledConnection<'a> {
-    fn drop(&mut self) {
-        if let Some(connection) = self.connection.take() {
-            self.pool.release(connection);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::error::AppError;
+    use std::sync::{mpsc, Arc};
+    use std::thread;
+    use std::time::Duration;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn make_temp_csv(contents: &str) -> PathBuf {
@@ -741,5 +623,100 @@ mod tests {
 
         assert_eq!(chunk.rows.len(), 25);
         assert!(!chunk.columns.is_empty());
+    }
+
+    #[test]
+    fn execute_query_chunk_succeeds_across_threads_after_describe_table() {
+        let csv_path = make_temp_csv("id,name\n1,alice\n");
+        let engine = Arc::new(DuckDbEngine::new(1));
+        let mut registered = HashMap::new();
+
+        let table = engine
+            .register_csv(&registered, csv_path.to_string_lossy().as_ref())
+            .expect("register CSV");
+        registered.insert(table.table_name.clone(), table.clone());
+
+        let describe_engine = Arc::clone(&engine);
+        let describe_registry = registered.clone();
+        let describe_table_name = table.table_name.clone();
+        let (describe_tx, describe_rx) = mpsc::channel();
+        let describe_worker = thread::spawn(move || {
+            let result = describe_engine
+                .describe_table(&describe_registry, &describe_table_name)
+                .map(|_| ());
+            describe_tx
+                .send(result)
+                .expect("send describe result");
+        });
+
+        describe_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("describe should finish")
+            .expect("describe should succeed");
+        describe_worker.join().expect("join describe worker");
+
+        let query_engine = Arc::clone(&engine);
+        let query_registry = registered.clone();
+        let sql = format!(
+            "SELECT * FROM {}",
+            sql_builder::quote_identifier(&table.table_name)
+        );
+        let (query_tx, query_rx) = mpsc::channel();
+        let query_worker = thread::spawn(move || {
+            let result = query_engine.execute_query_chunk(&query_registry, &sql, 100, 0);
+            query_tx.send(result).expect("send query result");
+        });
+
+        let chunk = query_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("query should finish without hanging")
+            .expect("query should succeed");
+        query_worker.join().expect("join query worker");
+
+        assert_eq!(chunk.rows.len(), 1);
+
+        let _ = std::fs::remove_file(csv_path);
+    }
+
+    #[test]
+    fn session_chunk_read_succeeds_after_interleaved_direct_query() {
+        let csv_path = make_temp_csv("id,name\n1,alice\n2,bob\n");
+        let engine = DuckDbEngine::new(1);
+        let mut registered = HashMap::new();
+
+        let table = engine
+            .register_csv(&registered, csv_path.to_string_lossy().as_ref())
+            .expect("register CSV");
+        registered.insert(table.table_name.clone(), table.clone());
+
+        let session = engine
+            .start_query_session(
+                &registered,
+                &format!(
+                    "SELECT * FROM {}",
+                    sql_builder::quote_identifier(&table.table_name)
+                ),
+            )
+            .expect("start query session");
+
+        let direct = engine
+            .execute_query_chunk(
+                &registered,
+                &format!(
+                    "SELECT * FROM {} ORDER BY id",
+                    sql_builder::quote_identifier(&table.table_name)
+                ),
+                1,
+                0,
+            )
+            .expect("run direct query between session reads");
+        assert_eq!(direct.rows.len(), 1);
+
+        let chunk = engine
+            .read_query_session_chunk(&registered, &session.session_id, 10, 0)
+            .expect("read query session chunk");
+
+        assert_eq!(chunk.rows.len(), 2);
+        let _ = std::fs::remove_file(csv_path);
     }
 }

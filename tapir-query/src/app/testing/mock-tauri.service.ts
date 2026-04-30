@@ -15,6 +15,7 @@ import {
 export class MockTauriService {
   openFileCalls: string[] = [];
   executeQueryCalls: ExecuteQueryRequest[] = [];
+  executeQueryResults: QueryChunk[] = [];
   startQuerySessionCalls: StartQuerySessionRequest[] = [];
   readQuerySessionChunkCalls: ReadQuerySessionChunkRequest[] = [];
   closeQuerySessionCalls: CloseQuerySessionRequest[] = [];
@@ -64,6 +65,11 @@ export class MockTauriService {
 
   async executeQuery(payload: ExecuteQueryRequest): Promise<QueryChunk> {
     this.executeQueryCalls.push(payload);
+    const nextResult = this.executeQueryResults.shift();
+    if (nextResult) {
+      return nextResult;
+    }
+
     return this.queryResult;
   }
 
@@ -77,9 +83,7 @@ export class MockTauriService {
     return this.queryResult;
   }
 
-  async closeQuerySession(
-    payload: CloseQuerySessionRequest,
-  ): Promise<CloseQuerySessionResponse> {
+  async closeQuerySession(payload: CloseQuerySessionRequest): Promise<CloseQuerySessionResponse> {
     this.closeQuerySessionCalls.push(payload);
     return this.closeSessionResult;
   }
@@ -97,6 +101,7 @@ export class MockTauriService {
   reset(): void {
     this.openFileCalls = [];
     this.executeQueryCalls = [];
+    this.executeQueryResults = [];
     this.startQuerySessionCalls = [];
     this.readQuerySessionChunkCalls = [];
     this.closeQuerySessionCalls = [];

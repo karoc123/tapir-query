@@ -144,10 +144,20 @@ pub async fn execute_query(
     let limit = request.limit.unwrap_or(200);
     let offset = request.offset.unwrap_or(0);
 
-    async_runtime::spawn_blocking(move || csv_service.execute_query(&sql, limit, offset))
+    let chunk = async_runtime::spawn_blocking(move || csv_service.execute_query(&sql, limit, offset))
         .await
         .map_err(|error| map_join_error("execute_query", error))?
-        .map_err(map_error)
+        .map_err(map_error)?;
+
+    info!(
+        "execute_query success rows={} columns={} next_offset={:?} elapsed_ms={}",
+        chunk.rows.len(),
+        chunk.columns.len(),
+        chunk.next_offset,
+        chunk.elapsed_ms
+    );
+
+    Ok(chunk)
 }
 
 #[tauri::command]

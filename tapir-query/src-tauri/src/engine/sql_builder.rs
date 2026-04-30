@@ -47,10 +47,6 @@ pub fn build_register_view_sql(table_name: &str, csv_path: &str) -> String {
     )
 }
 
-pub fn build_drop_view_sql(table_name: &str) -> String {
-    format!("DROP VIEW IF EXISTS {}", quote_identifier(table_name))
-}
-
 pub fn build_default_query(table_name: &str) -> String {
     format!("SELECT * FROM {}", quote_identifier(table_name))
 }
@@ -75,42 +71,6 @@ pub fn build_paged_select_sql(
         .join(", ");
 
     format!("SELECT {projections} FROM ({sql}) AS tapir_result LIMIT {limit} OFFSET {offset}")
-}
-
-pub fn build_materialized_session_sql(sql: &str, session_table_name: &str) -> String {
-    format!(
-        "CREATE OR REPLACE TEMP TABLE {} AS SELECT * FROM ({sql}) AS tapir_result;",
-        quote_identifier(session_table_name)
-    )
-}
-
-pub fn build_paged_session_sql(
-    session_table_name: &str,
-    columns: &[String],
-    limit: usize,
-    offset: usize,
-) -> String {
-    let projections = columns
-        .iter()
-        .map(|column| {
-            let name = quote_identifier(column);
-            format!("CAST({name} AS VARCHAR) AS {name}")
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
-
-    format!(
-        "SELECT {projections} FROM {} LIMIT {limit} OFFSET {offset}",
-        quote_identifier(session_table_name)
-    )
-}
-
-pub fn build_count_table_sql(table_name: &str) -> String {
-    format!("SELECT COUNT(*) FROM {}", quote_identifier(table_name))
-}
-
-pub fn build_drop_table_sql(table_name: &str) -> String {
-    format!("DROP TABLE IF EXISTS {}", quote_identifier(table_name))
 }
 
 pub fn build_count_sql(sql: &str) -> String {
@@ -158,26 +118,4 @@ mod tests {
         assert!(sql.contains("LIMIT 200 OFFSET 0"));
     }
 
-    #[test]
-    fn builds_materialized_session_query() {
-        let sql = build_materialized_session_sql("SELECT * FROM transactions", "tapir_session_1");
-
-        assert!(sql.contains("CREATE OR REPLACE TEMP TABLE \"tapir_session_1\""));
-        assert!(sql.contains("SELECT * FROM (SELECT * FROM transactions) AS tapir_result"));
-    }
-
-    #[test]
-    fn builds_paged_materialized_session_query() {
-        let sql = build_paged_session_sql(
-            "tapir_session_1",
-            &[String::from("amount"), String::from("customer id")],
-            100,
-            300,
-        );
-
-        assert!(sql.contains("FROM \"tapir_session_1\""));
-        assert!(sql.contains("CAST(\"amount\" AS VARCHAR) AS \"amount\""));
-        assert!(sql.contains("CAST(\"customer id\" AS VARCHAR) AS \"customer id\""));
-        assert!(sql.contains("LIMIT 100 OFFSET 300"));
-    }
 }

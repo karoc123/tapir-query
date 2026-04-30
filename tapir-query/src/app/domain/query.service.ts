@@ -38,6 +38,13 @@ interface ExecuteSqlOptions {
   statusOnFinish: (totalRows: number, elapsedMs: number, loadedRows: number) => string;
 }
 
+interface ExecuteDirectOptions {
+  sortColumn?: string | null;
+  sortDirection?: SortDirection | null;
+  statusOnStart?: string;
+  statusOnFinish?: (elapsedMs: number, loadedRows: number) => string;
+}
+
 @Injectable({
   providedIn: "root",
 })
@@ -53,6 +60,7 @@ export class QueryService {
   private readonly streamChunkSize = 1_000;
   private readonly windowSize = 10_000;
   private readonly prefetchThreshold = 300;
+  private readonly firstSessionChunkTimeoutMs = 2_500;
   private readonly historyStorageKey = "tapir.queryHistory.v1";
 
   private requestToken = 0;
@@ -89,12 +97,10 @@ export class QueryService {
   readonly statusMessage = computed(() => this.state().statusMessage);
   readonly lastQueryElapsedMs = computed(() => this.state().lastQueryElapsedMs);
   readonly queryHistory = computed(() => this.state().queryHistory);
-  readonly visibleRowCount = computed(() => {
-    const totalRows = this.state().totalRows;
-    return totalRows > 0 ? totalRows : this.state().rows.length;
-  });
+  readonly effectiveSql = computed(() => this.state().effectiveSql);
   readonly activeSortColumn = computed(() => this.state().activeSortColumn);
   readonly activeSortDirection = computed(() => this.state().activeSortDirection);
+  readonly hasActiveSession = computed(() => this.state().activeSessionId !== null);
 
   updateQuery(query: string): void {
     this.logs.info("query", "Query text updated", {
@@ -175,11 +181,10 @@ export class QueryService {
         columns: opened.columns.length,
       });
 
-      await this.executeSqlWithSessionStreaming({
-        sql: previewQuery,
-        resetSort: true,
+      // Preview queries include LIMIT and are intentionally executed directly to keep
+      // startup resilient even when session streaming is under pressure.
+      await this.executeSqlDirect(previewQuery, {
         statusOnStart: "Running initial preview query...",
-        statusOnFinish: (_totalRows, elapsedMs, loadedRows) => `Preview ready for ${opened.tableName}: ${loadedRows.toLocaleString()} rows in ${elapsedMs} ms. Remove LIMIT to run a full-table query.`,
       });
 
       this.logs.info("query", "File loaded and initial query executed", {
@@ -228,16 +233,10 @@ export class QueryService {
       activeSortDirection: null,
     });
 
-    if (this.shouldUseDirectExecution(sql)) {
-      await this.executeSqlDirect(sql);
-      return;
-    }
-
-    await this.executeSqlWithSessionStreaming({
-      sql,
-      resetSort: true,
+    await this.executeSqlDirect(sql, {
       statusOnStart: "Running query...",
-      statusOnFinish: (totalRows, elapsedMs, loadedRows) => `Query ready: ${totalRows.toLocaleString()} rows in ${elapsedMs} ms (showing ${loadedRows.toLocaleString()}).`,
+      statusOnFinish: (elapsedMs, loadedRows) =>
+        `Query ready: ${loadedRows.toLocaleString()} rows in ${elapsedMs} ms (direct mode).`,
     });
   }
 
@@ -250,7 +249,8 @@ export class QueryService {
       return;
     }
 
-    const sql = this.sqlGenerator.withOrderBy(this.state().query, columnName, direction, tableName);
+    const baseSql = this.state().effectiveSql ?? this.state().query;
+    const sql = this.sqlGenerator.withOrderBy(baseSql, columnName, direction, tableName);
     const nextHistory = this.computeNextHistory(this.state().queryHistory, sql);
     this.persistHistory(nextHistory);
 
@@ -266,14 +266,12 @@ export class QueryService {
       tableName,
     });
 
-    await this.executeSqlWithSessionStreaming({
-      sql,
-      resetSort: false,
+    await this.executeSqlDirect(sql, {
+      statusOnStart: `Sorting full dataset by ${columnName} (${direction.toUpperCase()})...`,
+      statusOnFinish: (elapsedMs, loadedRows) =>
+        `Sorted ${loadedRows.toLocaleString()} rows by ${columnName} (${direction.toUpperCase()}) in ${elapsedMs} ms (direct mode).`,
       sortColumn: columnName,
       sortDirection: direction,
-      statusOnStart: `Sorting full dataset by ${columnName} (${direction.toUpperCase()})...`,
-      statusOnFinish: (totalRows, elapsedMs, loadedRows) =>
-        `Sorted ${totalRows.toLocaleString()} rows by ${columnName} (${direction.toUpperCase()}) in ${elapsedMs} ms (showing ${loadedRows.toLocaleString()}).`,
     });
   }
 
@@ -364,6 +362,7 @@ export class QueryService {
   private async executeSqlWithSessionStreaming(options: ExecuteSqlOptions): Promise<void> {
     const requestToken = this.createRequestToken();
     this.windowFetchInFlight = false;
+    let openedSessionId: string | null = null;
 
     this.logs.debug("query-session", "start_query_session request received", {
       sqlLength: options.sql.length,
@@ -402,6 +401,7 @@ export class QueryService {
       const session = await this.bridge.startQuerySession({
         sql: options.sql,
       });
+      openedSessionId = session.sessionId;
 
       this.logs.info("query-session", "start_query_session success", {
         sessionId: session.sessionId,
@@ -428,11 +428,15 @@ export class QueryService {
       });
 
       this.perf.start("queryRoundTrip");
-      const firstChunk = await this.bridge.readQuerySessionChunk({
-        sessionId: session.sessionId,
-        limit: this.initialChunkSize,
-        offset: 0,
-      });
+      const firstChunk = await this.withTimeout(
+        this.bridge.readQuerySessionChunk({
+          sessionId: session.sessionId,
+          limit: this.initialChunkSize,
+          offset: 0,
+        }),
+        this.firstSessionChunkTimeoutMs,
+        "Timed out while loading the first session chunk.",
+      );
       this.perf.end("queryRoundTrip");
 
       if (!this.isActiveRequest(requestToken)) {
@@ -470,25 +474,39 @@ export class QueryService {
       this.clearSlowLoadTimer();
     } catch (error) {
       this.perf.end("queryRoundTrip");
+      if (openedSessionId !== null) {
+        await this.closeSessionById(openedSessionId);
+      }
+
       if (!this.isActiveRequest(requestToken)) {
         return;
       }
 
       const parsed = this.parseError(error);
-      this.patch({
-        loading: false,
-        showSlowLoadHint: false,
-        queryError: parsed,
-        statusMessage: "Query execution failed.",
+      this.logs.warn("query-session", "Session streaming failed; falling back to direct mode", {
+        error: parsed.rawMessage,
+        resetSort: options.resetSort,
+        sortColumn: options.sortColumn ?? null,
+        sortDirection: options.sortDirection ?? null,
       });
       this.clearSlowLoadTimer();
-      this.logs.error("query", "Query execution failed", {
-        error: parsed.rawMessage,
+
+      await this.executeSqlDirect(options.sql, {
+        statusOnStart: "Streaming stalled. Running direct query...",
+        statusOnFinish: (elapsedMs, loadedRows) => {
+          if (options.sortColumn && options.sortDirection) {
+            return `Sorted ${loadedRows.toLocaleString()} rows by ${options.sortColumn} (${options.sortDirection.toUpperCase()}) in ${elapsedMs} ms (direct fallback).`;
+          }
+
+          return `Query ready: ${loadedRows.toLocaleString()} rows in ${elapsedMs} ms (direct fallback).`;
+        },
+        sortColumn: options.resetSort ? null : options.sortColumn ?? null,
+        sortDirection: options.resetSort ? null : options.sortDirection ?? null,
       });
     }
   }
 
-  private async executeSqlDirect(sql: string): Promise<void> {
+  private async executeSqlDirect(sql: string, options?: ExecuteDirectOptions): Promise<void> {
     const requestToken = this.createRequestToken();
     this.windowFetchInFlight = false;
 
@@ -507,9 +525,9 @@ export class QueryService {
       totalRows: 0,
       windowStartOffset: 0,
       activeSessionId: null,
-      statusMessage: "Running aggregate query...",
-      activeSortColumn: null,
-      activeSortDirection: null,
+      statusMessage: options?.statusOnStart ?? "Running direct query...",
+      activeSortColumn: options?.sortColumn ?? null,
+      activeSortDirection: options?.sortDirection ?? null,
     });
 
     await this.yieldToUi();
@@ -531,6 +549,9 @@ export class QueryService {
 
       const rows = [...chunk.rows];
       const totalRows = chunk.offset + rows.length + (chunk.nextOffset !== null ? 1 : 0);
+      const statusMessage =
+        options?.statusOnFinish?.(chunk.elapsedMs, rows.length) ??
+        `Query ready: ${rows.length.toLocaleString()} rows in ${chunk.elapsedMs} ms (direct mode).`;
 
       this.state.update((current) => ({
         ...current,
@@ -542,7 +563,7 @@ export class QueryService {
         loading: false,
         showSlowLoadHint: false,
         queryError: null,
-        statusMessage: `Query ready: ${rows.length.toLocaleString()} rows in ${chunk.elapsedMs} ms (direct mode).`,
+        statusMessage,
         lastQueryElapsedMs: chunk.elapsedMs,
         effectiveSql: sql,
       }));
@@ -566,6 +587,24 @@ export class QueryService {
         error: parsed.rawMessage,
       });
     }
+  }
+
+  private async withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+    return await new Promise<T>((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error(timeoutMessage));
+      }, timeoutMs);
+
+      promise
+        .then((result) => {
+          clearTimeout(timeoutId);
+          resolve(result);
+        })
+        .catch((error) => {
+          clearTimeout(timeoutId);
+          reject(error);
+        });
+    });
   }
 
   private async prefetchWindowAround(viewportIndex: number): Promise<void> {
@@ -829,15 +868,6 @@ export class QueryService {
     }
   }
 
-  private shouldUseDirectExecution(sql: string): boolean {
-    const normalized = sql.trim().replace(/;+\s*$/, "");
-    if (!/^select\s+count\s*\(\s*(\*|1)\s*\)\s+from\s+/i.test(normalized)) {
-      return false;
-    }
-
-    return !/\b(group\s+by|having|union|intersect|except)\b|\bover\s*\(/i.test(normalized);
-  }
-
   private buildPreviewQuery(sql: string): string {
     const normalized = sql.trim().replace(/;+\s*$/, "");
     if (/\blimit\s+\d+\b/i.test(normalized)) {
@@ -852,12 +882,22 @@ export class QueryService {
   }
 
   private async yieldToUi(): Promise<void> {
-    if (typeof requestAnimationFrame !== "function") {
-      return;
-    }
-
     await new Promise<void>((resolve) => {
-      requestAnimationFrame(() => resolve());
+      let settled = false;
+      const finish = (): void => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        resolve();
+      };
+
+      if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(() => finish());
+      }
+
+      setTimeout(() => finish(), 16);
     });
   }
 }

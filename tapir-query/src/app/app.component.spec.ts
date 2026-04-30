@@ -22,22 +22,24 @@ describe("AppComponent", () => {
     const component = fixture.componentInstance;
 
     expect(component.isEmptyLayout()).toBe(true);
-
-    fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain("Drop CSV here");
-
     await component.onFileDropped("/tmp/transactions.csv");
-    fixture.detectChanges();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    await Promise.resolve();
 
     expect(bridgeMock.openFileCalls).toEqual(["/tmp/transactions.csv"]);
-    expect(bridgeMock.startQuerySessionCalls.length).toBe(1);
-    expect(bridgeMock.readQuerySessionChunkCalls.length).toBe(1);
-    expect(bridgeMock.executeQueryCalls.length).toBe(0);
+    expect(bridgeMock.startQuerySessionCalls.length).toBe(0);
+    expect(bridgeMock.readQuerySessionChunkCalls.length).toBe(0);
+    expect(bridgeMock.executeQueryCalls).toHaveLength(1);
+    expect(bridgeMock.executeQueryCalls[0]).toEqual({
+      sql: "SELECT * FROM transactions LIMIT 1000",
+      limit: 1000,
+      offset: 0,
+    });
     expect(component.rows().length).toBe(1);
     expect(component.columns()).toEqual(["amount", "currency"]);
     expect(component.queryError()).toBeNull();
     expect(component.isLoadedLayout()).toBe(true);
-    expect(fixture.nativeElement.textContent).toContain("Query took");
+    expect(component.rowStatusLabel()).toBe("1 Row");
   });
 
   it("prevents query execution before a file is loaded", async () => {

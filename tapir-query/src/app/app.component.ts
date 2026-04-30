@@ -1,5 +1,6 @@
 import { CommonModule } from "@angular/common";
-import { afterNextRender, Component, computed, inject, OnDestroy } from "@angular/core";
+import { afterNextRender, Component, computed, effect, inject, OnDestroy } from "@angular/core";
+import { DatasetMetricsService } from "./domain/dataset-metrics.service";
 import { FileService } from "./domain/file.service";
 import { QueryService } from "./domain/query.service";
 import { CheatSheetComponent } from "./features/cheat-sheet/cheat-sheet.component";
@@ -36,6 +37,7 @@ import { AppTheme, ThemeService } from "./infrastructure/theme.service";
 export class AppComponent implements OnDestroy {
   private readonly fileService = inject(FileService);
   private readonly queryService = inject(QueryService);
+  private readonly datasetMetricsService = inject(DatasetMetricsService);
   private readonly layoutState = inject(LayoutStateService);
   private readonly logsService = inject(LogService);
   private readonly perfService = inject(PerfService);
@@ -55,7 +57,7 @@ export class AppComponent implements OnDestroy {
   readonly rows = this.queryService.rows;
   readonly totalRowCount = this.queryService.totalRowCount;
   readonly windowStartOffset = this.queryService.windowStartOffset;
-  readonly visibleRowCount = this.queryService.visibleRowCount;
+  readonly effectiveSql = this.queryService.effectiveSql;
   readonly lastQueryElapsedMs = this.queryService.lastQueryElapsedMs;
   readonly statusMessage = this.queryService.statusMessage;
   readonly showSlowLoadHint = this.queryService.showSlowLoadHint;
@@ -73,7 +75,14 @@ export class AppComponent implements OnDestroy {
   readonly themeOptions = this.themeService.options;
   readonly defaultExportPath = "exports/query-results.csv";
 
-  readonly rowStatusLabel = computed(() => `${this.visibleRowCount().toLocaleString()} rows`);
+  readonly rowStatusLabel = computed(() => {
+    if (this.datasetMetricsService.hasActiveSignature()) {
+      return this.datasetMetricsService.rowStatusLabel();
+    }
+
+    const visibleRows = this.rows().length;
+    return `${visibleRows.toLocaleString()} ${visibleRows === 1 ? "Row" : "Rows"}`;
+  });
 
   readonly queryElapsedLabel = computed(() => {
     const elapsed = this.lastQueryElapsedMs();
@@ -94,6 +103,20 @@ export class AppComponent implements OnDestroy {
   );
 
   constructor() {
+    effect(() => {
+      const loading = this.loading();
+      const queryError = this.queryError();
+      const tableName = this.currentTable();
+      const effectiveSql = this.effectiveSql();
+
+      if (loading || queryError !== null || !tableName || !effectiveSql) {
+        this.datasetMetricsService.clear();
+        return;
+      }
+
+      this.datasetMetricsService.refresh(effectiveSql, tableName);
+    });
+
     afterNextRender(() => {
       this.perfService.markBootReady();
       this.logsService.info("boot", "Application is ready");
@@ -106,6 +129,7 @@ export class AppComponent implements OnDestroy {
       unlisten();
     }
     this.unlistenNativeDropEvents.length = 0;
+    this.datasetMetricsService.clear();
   }
 
   onFileDropped(filePath: string): Promise<void> {
