@@ -15,7 +15,14 @@
     </div>
   </header>
 
-  <div class="analysis-content" [class.drag-active]="dropActive()" (dragover)="onDropZoneDragOver($event)" (dragleave)="onDropZoneDragLeave($event)" (drop)="onDropZoneDrop($event)">
+  <div
+    class="analysis-content"
+    [class.drag-active]="dropActive()"
+    (dragenter)="onDropZoneDragEnter($event)"
+    (dragover)="onDropZoneDragOver($event)"
+    (dragleave)="onDropZoneDragLeave($event)"
+    (drop)="onDropZoneDrop($event)"
+  >
     @if (columns().length === 0) {
       <div class="analysis-empty-state">
         <p class="analysis-empty-copy">Ziehe eine Column aus der Columns-Ansicht in diesen Bereich, um Charts zu laden.</p>

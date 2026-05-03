@@ -313,4 +313,35 @@ describe("DataAnalysisPluginService", () => {
     expect(service.columnProfiles()[0]?.columnName).toBe("partner");
     expect(service.columnProfiles()[0]?.completeness.status).toBe("ready");
   });
+
+  it("suspends active work and ignores late metric results until the next refresh", async () => {
+    const service = TestBed.inject(DataAnalysisPluginService);
+    const deferred = createDeferred<ColumnProfileMetricResult>();
+
+    bridgeMock.runColumnProfileMetricImpl = async () => await deferred.promise;
+
+    service.enable();
+    service.refresh({
+      tableName: "transactions",
+      sql: "SELECT * FROM transactions",
+      columns: [{ name: "partner", dataType: "VARCHAR" }],
+    });
+
+    expect(service.running()).toBe(true);
+    expect(service.columnProfiles()[0]?.completeness.status).toBe("loading");
+    expect(bridgeMock.runColumnProfileMetricCalls.length).toBeGreaterThan(0);
+
+    service.suspend();
+
+    expect(service.running()).toBe(false);
+    expect(service.columnProfiles()).toEqual([]);
+    expect(service.totalTasks()).toBe(0);
+    expect(service.completedTasks()).toBe(0);
+
+    deferred.resolve(completenessResult("partner", 1));
+    await flushPromises();
+
+    expect(service.columnProfiles()).toEqual([]);
+    expect(service.completedTasks()).toBe(0);
+  });
 });

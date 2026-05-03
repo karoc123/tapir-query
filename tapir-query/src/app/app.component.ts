@@ -198,6 +198,9 @@ export class AppComponent implements OnDestroy {
       }
 
       if (loading || queryError !== null || !tableName || !effectiveSql) {
+        untracked(() => {
+          this.dataAnalysisPluginService.suspend();
+        });
         return;
       }
 

@@ -33,5 +33,6 @@ export class SchemaSidebarComponent {
     transfer.setData("text/x-tapir-column-name", column.name);
     transfer.setData("text/x-tapir-column-type", column.dataType);
     transfer.setData("text/plain", column.name);
+    transfer.setData("Text", column.name);
   }
 }

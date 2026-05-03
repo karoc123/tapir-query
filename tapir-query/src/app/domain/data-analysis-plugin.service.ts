@@ -136,6 +136,23 @@ export class DataAnalysisPluginService {
     });
   }
 
+  suspend(): void {
+    if (!this.state().enabled) {
+      return;
+    }
+
+    this.logs.debug("analysis-plugin", "Suspending analysis plugin until query stabilizes");
+    this.stopActiveRun();
+    this.state.update((current) => ({
+      ...current,
+      running: false,
+      activeSignature: null,
+      columns: [],
+      totalTasks: 0,
+      completedTasks: 0,
+    }));
+  }
+
   refresh(context: AnalysisRefreshContext): void {
     const snapshot = this.state();
     if (!snapshot.enabled) {
