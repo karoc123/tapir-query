@@ -9,6 +9,8 @@ use tauri::{async_runtime, Manager, State};
 use tokio::fs;
 use tracing::{error, info, warn};
 
+const SQL_PREVIEW_LIMIT: usize = 240;
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenFileRequest {
@@ -159,6 +161,17 @@ fn sanitize_query_history(entries: Vec<QueryHistoryEntry>) -> Vec<QueryHistoryEn
         .collect()
 }
 
+fn summarize_sql(sql: &str) -> String {
+    let compact = sql.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut preview = compact.chars().take(SQL_PREVIEW_LIMIT).collect::<String>();
+
+    if compact.chars().count() > SQL_PREVIEW_LIMIT {
+        preview.push_str("...");
+    }
+
+    preview
+}
+
 #[tauri::command]
 pub async fn open_file(
     request: OpenFileRequest,
@@ -281,8 +294,11 @@ pub async fn execute_query(
     state: State<'_, AppState>,
 ) -> Result<crate::engine::QueryChunk, String> {
     info!(
-        "execute_query request received limit={:?} offset={:?}",
-        request.limit, request.offset
+        "execute_query request received sql_len={} sql_preview={} limit={:?} offset={:?}",
+        request.sql.len(),
+        summarize_sql(&request.sql),
+        request.limit,
+        request.offset
     );
 
     let csv_service = state.csv_service.clone();
@@ -313,10 +329,11 @@ pub async fn run_column_profile_metric(
     state: State<'_, AppState>,
 ) -> Result<crate::engine::ColumnProfileMetric, String> {
     info!(
-        "run_column_profile_metric request received column={} metric={:?} sql_len={} total_rows_hint={:?}",
+        "run_column_profile_metric request received column={} metric={:?} sql_len={} sql_preview={} total_rows_hint={:?}",
         request.column_name,
         request.metric,
         request.sql.len(),
+        summarize_sql(&request.sql),
         request.total_rows_hint
     );
 
@@ -351,7 +368,11 @@ pub async fn start_query_session(
     request: StartQuerySessionRequest,
     state: State<'_, AppState>,
 ) -> Result<StartQuerySessionResponse, String> {
-    info!("start_query_session request received");
+    info!(
+        "start_query_session request received sql_len={} sql_preview={}",
+        request.sql.len(),
+        summarize_sql(&request.sql)
+    );
 
     let csv_service = state.csv_service.clone();
     let sql = request.sql;
@@ -417,7 +438,12 @@ pub async fn export_csv(
     request: ExportCsvRequest,
     state: State<'_, AppState>,
 ) -> Result<ExportCsvResponse, String> {
-    info!("export_csv request received output={}", request.output_path);
+    info!(
+        "export_csv request received sql_len={} sql_preview={} output={}",
+        request.sql.len(),
+        summarize_sql(&request.sql),
+        request.output_path
+    );
 
     let csv_service = state.csv_service.clone();
     let sql = request.sql;

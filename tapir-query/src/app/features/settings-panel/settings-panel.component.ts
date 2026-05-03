@@ -14,6 +14,7 @@ export class SettingsPanelComponent {
   readonly activeTheme = input<AppTheme>("light");
   readonly options = input<ThemeOption[]>([]);
   readonly version = input<string | null>(null);
+  readonly runtimeLogPath = input<string | null>(null);
 
   readonly closeRequested = output<void>();
   readonly themeSelected = output<AppTheme>();

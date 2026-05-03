@@ -13,6 +13,7 @@ describe("SettingsPanelComponent", () => {
 
     fixture.componentRef.setInput("open", true);
     fixture.componentRef.setInput("version", "1.2.3");
+    fixture.componentRef.setInput("runtimeLogPath", "C:/Users/test/AppData/Roaming/tapir-query/logs/tapir-query.log");
     fixture.componentRef.setInput("options", []);
     fixture.detectChanges();
 
@@ -20,5 +21,7 @@ describe("SettingsPanelComponent", () => {
 
     expect(textContent).toContain("Version");
     expect(textContent).toContain("1.2.3");
+    expect(textContent).toContain("Runtime Log");
+    expect(textContent).toContain("tapir-query.log");
   });
 });

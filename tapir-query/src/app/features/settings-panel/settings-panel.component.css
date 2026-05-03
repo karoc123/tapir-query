@@ -75,6 +75,13 @@
   padding: 0.6rem 0.65rem;
 }
 
+.app-meta-card-stacked {
+  margin-top: 0.55rem;
+  display: grid;
+  justify-content: stretch;
+  align-items: start;
+}
+
 .app-meta-label {
   font-size: 0.72rem;
   text-transform: uppercase;
@@ -87,6 +94,12 @@
   font-size: 0.8rem;
   font-weight: 700;
   color: var(--tapir-heading);
+}
+
+.app-meta-path {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
 }
 
 .theme-card {

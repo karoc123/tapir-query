@@ -96,6 +96,7 @@ export class AppComponent implements OnDestroy {
   readonly settingsOpen = this.themeService.settingsOpen;
   readonly themeOptions = this.themeService.options;
   readonly appVersion = this.appInfoService.version;
+  readonly appRuntimeLogPath = this.appInfoService.runtimeLogPath;
   readonly defaultExportPath = "exports/query-results.csv";
   readonly totalCountPending = computed(() => this.datasetMetricsService.hasActiveSignature() && this.datasetMetricsService.totalPending());
 

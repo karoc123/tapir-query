@@ -25,6 +25,10 @@
         <span class="app-meta-label">Version</span>
         <span class="app-meta-value">{{ version() ?? "unknown" }}</span>
       </div>
+      <div class="app-meta-card app-meta-card-stacked">
+        <span class="app-meta-label">Runtime Log</span>
+        <span class="app-meta-value app-meta-path">{{ runtimeLogPath() ?? "unknown" }}</span>
+      </div>
     </section>
   </aside>
 }
