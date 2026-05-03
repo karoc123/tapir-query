@@ -195,6 +195,17 @@ impl DuckDbEngine {
             .map_err(|error| AppError::Sql(format!("failed to validate query: {error}")))
     }
 
+    /// Pure-Rust SQL syntax check using sqlparser — runs before any DuckDB FFI call.
+    /// Catches obviously malformed SQL without touching the DuckDB C library,
+    /// preventing crashes in the bundled DuckDB on Windows.
+    fn pre_validate_user_sql(sql: &str) -> EngineResult<()> {
+        use sqlparser::dialect::DuckDbDialect;
+        use sqlparser::parser::Parser;
+        Parser::parse_sql(&DuckDbDialect {}, sql)
+            .map(|_| ())
+            .map_err(|error| AppError::Sql(format!("SQL syntax error: {error}")))
+    }
+
     fn normalize_sql(&self, sql: &str) -> String {
         sql.trim().trim_end_matches(';').trim().to_string()
     }
@@ -474,6 +485,8 @@ impl CsvQueryEngine for DuckDbEngine {
             return Err(AppError::Validation(String::from("query cannot be empty")));
         }
 
+        Self::pre_validate_user_sql(&normalized_sql)?;
+
         let bounded_limit = limit.clamp(1, 2_000);
         debug!(
             "execute_query_chunk limit={} offset={} bounded_limit={}",
@@ -554,6 +567,7 @@ impl CsvQueryEngine for DuckDbEngine {
         }
 
         let normalized_sql = sql.trim().trim_end_matches(';').to_string();
+        Self::pre_validate_user_sql(&normalized_sql)?;
         let session_id = self.next_session_id();
 
         let started = Instant::now();
@@ -710,6 +724,8 @@ impl CsvQueryEngine for DuckDbEngine {
             )));
         }
 
+        Self::pre_validate_user_sql(&normalized_sql)?;
+
         let target_path = PathBuf::from(output_path);
         if let Some(parent) = target_path.parent() {
             std::fs::create_dir_all(parent).map_err(|error| {
@@ -763,6 +779,8 @@ impl CsvQueryEngine for DuckDbEngine {
                 "column name cannot be empty for profiling",
             )));
         }
+
+        Self::pre_validate_user_sql(&normalized_sql)?;
 
         self.with_connection(registered, |connection| {
             let started = Instant::now();
