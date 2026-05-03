@@ -14,6 +14,7 @@ describe("SettingsPanelComponent", () => {
     fixture.componentRef.setInput("open", true);
     fixture.componentRef.setInput("version", "1.2.3");
     fixture.componentRef.setInput("runtimeLogPath", "C:/Users/test/AppData/Roaming/tapir-query/logs/tapir-query.log");
+    fixture.componentRef.setInput("runtimeLoggingEnabled", false);
     fixture.componentRef.setInput("options", []);
     fixture.detectChanges();
 
@@ -21,7 +22,26 @@ describe("SettingsPanelComponent", () => {
 
     expect(textContent).toContain("Version");
     expect(textContent).toContain("1.2.3");
-    expect(textContent).toContain("Runtime Log");
+    expect(textContent).toContain("Runtime Logging");
     expect(textContent).toContain("tapir-query.log");
+    expect(textContent).toContain("Off by default");
+  });
+
+  it("emits runtime logging toggle requests", () => {
+    const fixture = TestBed.createComponent(SettingsPanelComponent);
+    const component = fixture.componentInstance;
+    const emitted: boolean[] = [];
+
+    component.runtimeLoggingToggled.subscribe((enabled) => emitted.push(enabled));
+
+    fixture.componentRef.setInput("open", true);
+    fixture.componentRef.setInput("runtimeLoggingEnabled", false);
+    fixture.componentRef.setInput("options", []);
+    fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector(".settings-toggle-button") as HTMLButtonElement;
+    button.click();
+
+    expect(emitted).toEqual([true]);
   });
 });

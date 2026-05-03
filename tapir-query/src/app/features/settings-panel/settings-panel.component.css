@@ -82,6 +82,44 @@
   align-items: start;
 }
 
+.settings-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.8rem;
+  margin-bottom: 0.45rem;
+}
+
+.settings-toggle-copy {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.settings-toggle-hint {
+  font-size: 0.72rem;
+  color: var(--tapir-muted);
+  line-height: 1.4;
+}
+
+.settings-toggle-button {
+  border: 1px solid var(--tapir-border);
+  border-radius: 999px;
+  background: var(--tapir-surface);
+  color: var(--tapir-text);
+  min-width: 3.4rem;
+  padding: 0.34rem 0.7rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.settings-toggle-button.active {
+  border-color: var(--tapir-accent);
+  background: color-mix(in srgb, var(--tapir-accent) 18%, var(--tapir-surface));
+  color: var(--tapir-heading);
+}
+
 .app-meta-label {
   font-size: 0.72rem;
   text-transform: uppercase;

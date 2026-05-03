@@ -127,3 +127,12 @@ export interface ExportCsvResponse {
   outputPath: string;
   rowsWritten: number;
 }
+
+export interface RuntimeLoggingStatusResponse {
+  enabled: boolean;
+  logPath: string;
+}
+
+export interface SetRuntimeLoggingRequest {
+  enabled: boolean;
+}

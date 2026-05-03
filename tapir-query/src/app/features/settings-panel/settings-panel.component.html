@@ -26,7 +26,16 @@
         <span class="app-meta-value">{{ version() ?? "unknown" }}</span>
       </div>
       <div class="app-meta-card app-meta-card-stacked">
-        <span class="app-meta-label">Runtime Log</span>
+        <div class="settings-toggle-row">
+          <div class="settings-toggle-copy">
+            <span class="app-meta-label">Runtime Logging</span>
+            <span class="settings-toggle-hint">Off by default. Enable before reproducing a crash.</span>
+          </div>
+          <button type="button" class="settings-toggle-button" [class.active]="runtimeLoggingEnabled()" [attr.aria-pressed]="runtimeLoggingEnabled()" (click)="toggleRuntimeLogging()">
+            {{ runtimeLoggingEnabled() ? "On" : "Off" }}
+          </button>
+        </div>
+        <span class="app-meta-label">Runtime Log Path</span>
         <span class="app-meta-value app-meta-path">{{ runtimeLogPath() ?? "unknown" }}</span>
       </div>
     </section>

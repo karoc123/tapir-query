@@ -8,19 +8,31 @@ use crate::engine::duckdb_engine::DuckDbEngine;
 use std::backtrace::Backtrace;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{Arc, Once};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Once, OnceLock};
 use tauri::{AppHandle, Manager};
 use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::fmt::writer::MakeWriterExt;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
 
 static TRACING_INIT: Once = Once::new();
 static PANIC_HOOK_INIT: Once = Once::new();
+static RUNTIME_LOG_GUARD: OnceLock<WorkerGuard> = OnceLock::new();
+static RUNTIME_FILE_LOGGING_ENABLED: AtomicBool = AtomicBool::new(false);
 
 const RUNTIME_LOG_FILE_NAME: &str = "tapir-query.log";
 
 pub struct AppState {
     pub csv_service: Arc<CsvQueryService>,
+}
+
+pub(crate) fn runtime_file_logging_enabled() -> bool {
+    RUNTIME_FILE_LOGGING_ENABLED.load(Ordering::Relaxed)
+}
+
+pub(crate) fn set_runtime_file_logging_enabled(enabled: bool) {
+    RUNTIME_FILE_LOGGING_ENABLED.store(enabled, Ordering::Relaxed);
 }
 
 impl Default for AppState {
@@ -55,7 +67,7 @@ fn init_tracing(app_handle: &AppHandle) {
                         .with_ansi(false)
                         .with_target(false)
                         .compact()
-                        .with_writer(writer),
+                        .with_writer(writer.with_filter(|_| runtime_file_logging_enabled())),
                 )
             }
             Err(error) => {
@@ -71,16 +83,16 @@ fn init_tracing(app_handle: &AppHandle) {
 
         match subscriber.try_init() {
             Ok(()) => {
-                if let Some(path) = runtime_log_path {
-                    tracing::info!("runtime file logging enabled path={}", path.display());
-                }
-
                 if let Some(warning) = runtime_log_warning {
                     tracing::warn!("{warning}");
                 }
 
+                if let Some(path) = runtime_log_path {
+                    tracing::debug!("runtime file logging ready path={}", path.display());
+                }
+
                 if let Some(guard) = runtime_log_guard {
-                    std::mem::forget(guard);
+                    let _ = RUNTIME_LOG_GUARD.set(guard);
                 }
             }
             Err(error) => {
@@ -113,7 +125,7 @@ fn create_runtime_log_writer(
     Ok((writer, guard, log_path))
 }
 
-fn resolve_runtime_log_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn resolve_runtime_log_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
     let log_dir = app_handle
         .path()
         .app_log_dir()
@@ -175,7 +187,9 @@ pub fn run() {
             commands::csv_commands::load_query_history,
             commands::csv_commands::save_query_history,
             commands::csv_commands::export_csv,
-            commands::csv_commands::export_rows
+            commands::csv_commands::export_rows,
+            commands::csv_commands::get_runtime_logging_status,
+            commands::csv_commands::set_runtime_logging_enabled
         ]);
 
     if let Err(error) = builder.run(tauri::generate_context!()) {

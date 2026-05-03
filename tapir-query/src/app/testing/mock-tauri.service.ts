@@ -11,8 +11,10 @@ import {
   QuerySessionResponse,
   QueryChunk,
   ReadQuerySessionChunkRequest,
+  RuntimeLoggingStatusResponse,
   RunColumnProfileMetricRequest,
   SaveQueryHistoryRequest,
+  SetRuntimeLoggingRequest,
   StartQuerySessionRequest,
 } from "../infrastructure/tauri-contracts";
 
@@ -26,8 +28,10 @@ export class MockTauriService {
   exportCsvCalls: ExportCsvRequest[] = [];
   exportRowsCalls: ExportRowsRequest[] = [];
   saveQueryHistoryCalls: SaveQueryHistoryRequest[] = [];
+  setRuntimeLoggingEnabledCalls: SetRuntimeLoggingRequest[] = [];
   runColumnProfileMetricCalls: RunColumnProfileMetricRequest[] = [];
   runColumnProfileMetricResults: ColumnProfileMetricResult[] = [];
+  getRuntimeLoggingStatusCalls = 0;
 
   openFileResult: OpenFileResponse = {
     tableName: "transactions",
@@ -67,6 +71,11 @@ export class MockTauriService {
 
   queryHistoryResult: QueryHistoryResponse = {
     entries: [],
+  };
+
+  runtimeLoggingStatusResult: RuntimeLoggingStatusResponse = {
+    enabled: false,
+    logPath: "C:/Users/test/AppData/Local/com.zink.tapirquery/logs/tapir-query.log",
   };
 
   runColumnProfileMetricResult: ColumnProfileMetricResult = {
@@ -144,6 +153,20 @@ export class MockTauriService {
     return this.queryHistoryResult;
   }
 
+  async getRuntimeLoggingStatus(): Promise<RuntimeLoggingStatusResponse> {
+    this.getRuntimeLoggingStatusCalls += 1;
+    return this.runtimeLoggingStatusResult;
+  }
+
+  async setRuntimeLoggingEnabled(payload: SetRuntimeLoggingRequest): Promise<RuntimeLoggingStatusResponse> {
+    this.setRuntimeLoggingEnabledCalls.push(payload);
+    this.runtimeLoggingStatusResult = {
+      ...this.runtimeLoggingStatusResult,
+      enabled: payload.enabled,
+    };
+    return this.runtimeLoggingStatusResult;
+  }
+
   async runColumnProfileMetric(payload: RunColumnProfileMetricRequest): Promise<ColumnProfileMetricResult> {
     this.runColumnProfileMetricCalls.push(payload);
 
@@ -169,12 +192,18 @@ export class MockTauriService {
     this.exportCsvCalls = [];
     this.exportRowsCalls = [];
     this.saveQueryHistoryCalls = [];
+    this.setRuntimeLoggingEnabledCalls = [];
     this.runColumnProfileMetricCalls = [];
     this.runColumnProfileMetricResults = [];
+    this.getRuntimeLoggingStatusCalls = 0;
     this.executeQueryImpl = null;
     this.runColumnProfileMetricImpl = null;
     this.queryHistoryResult = {
       entries: [],
+    };
+    this.runtimeLoggingStatusResult = {
+      enabled: false,
+      logPath: "C:/Users/test/AppData/Local/com.zink.tapirquery/logs/tapir-query.log",
     };
   }
 }

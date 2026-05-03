@@ -97,6 +97,7 @@ export class AppComponent implements OnDestroy {
   readonly themeOptions = this.themeService.options;
   readonly appVersion = this.appInfoService.version;
   readonly appRuntimeLogPath = this.appInfoService.runtimeLogPath;
+  readonly runtimeLoggingEnabled = this.appInfoService.runtimeLoggingEnabled;
   readonly defaultExportPath = "exports/query-results.csv";
   readonly totalCountPending = computed(() => this.datasetMetricsService.hasActiveSignature() && this.datasetMetricsService.totalPending());
 
@@ -513,6 +514,21 @@ export class AppComponent implements OnDestroy {
     this.logsService.info("settings", "Theme changed", {
       theme,
     });
+  }
+
+  async onRuntimeLoggingToggled(enabled: boolean): Promise<void> {
+    try {
+      await this.appInfoService.setRuntimeLoggingEnabled(enabled);
+      this.logsService.info("settings", "Runtime logging changed", {
+        enabled,
+      });
+    } catch (error) {
+      this.logsService.error("settings", "Unable to update runtime logging", {
+        enabled,
+        error: this.extractError(error),
+      });
+      this.queryService.reportError("Unable to update runtime logging. Verify desktop runtime context and retry.");
+    }
   }
 
   formatActivityTime(timestamp: number): string {

@@ -13,8 +13,10 @@ import {
   QuerySessionResponse,
   QueryChunk,
   ReadQuerySessionChunkRequest,
+  RuntimeLoggingStatusResponse,
   RunColumnProfileMetricRequest,
   SaveQueryHistoryRequest,
+  SetRuntimeLoggingRequest,
   StartQuerySessionRequest,
 } from "./tauri-contracts";
 import { LogService } from "./log.service";
@@ -83,6 +85,16 @@ export class TauriBridgeService {
 
   saveQueryHistory(payload: SaveQueryHistoryRequest): Promise<QueryHistoryResponse> {
     return this.invokeWithLogging<QueryHistoryResponse>("save_query_history", {
+      request: payload,
+    });
+  }
+
+  getRuntimeLoggingStatus(): Promise<RuntimeLoggingStatusResponse> {
+    return this.invokeWithLogging<RuntimeLoggingStatusResponse>("get_runtime_logging_status");
+  }
+
+  setRuntimeLoggingEnabled(payload: SetRuntimeLoggingRequest): Promise<RuntimeLoggingStatusResponse> {
+    return this.invokeWithLogging<RuntimeLoggingStatusResponse>("set_runtime_logging_enabled", {
       request: payload,
     });
   }

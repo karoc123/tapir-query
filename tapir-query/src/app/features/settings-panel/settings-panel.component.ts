@@ -15,8 +15,10 @@ export class SettingsPanelComponent {
   readonly options = input<ThemeOption[]>([]);
   readonly version = input<string | null>(null);
   readonly runtimeLogPath = input<string | null>(null);
+  readonly runtimeLoggingEnabled = input(false);
 
   readonly closeRequested = output<void>();
+  readonly runtimeLoggingToggled = output<boolean>();
   readonly themeSelected = output<AppTheme>();
 
   close(): void {
@@ -25,5 +27,9 @@ export class SettingsPanelComponent {
 
   selectTheme(theme: AppTheme): void {
     this.themeSelected.emit(theme);
+  }
+
+  toggleRuntimeLogging(): void {
+    this.runtimeLoggingToggled.emit(!this.runtimeLoggingEnabled());
   }
 }

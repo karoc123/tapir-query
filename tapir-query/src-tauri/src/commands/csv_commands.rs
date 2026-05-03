@@ -101,6 +101,19 @@ pub struct ExportCsvResponse {
     pub rows_written: u64,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeLoggingStatusResponse {
+    pub enabled: bool,
+    pub log_path: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetRuntimeLoggingRequest {
+    pub enabled: bool,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct QueryHistoryEntry {
@@ -527,4 +540,37 @@ pub async fn export_rows(request: ExportRowsRequest) -> Result<ExportCsvResponse
     })
     .await
     .map_err(|error| map_join_error("export_rows", error))?
+}
+
+#[tauri::command]
+pub async fn get_runtime_logging_status(
+    app_handle: tauri::AppHandle,
+) -> Result<RuntimeLoggingStatusResponse, String> {
+    let log_path = crate::resolve_runtime_log_path(&app_handle)?;
+
+    Ok(RuntimeLoggingStatusResponse {
+        enabled: crate::runtime_file_logging_enabled(),
+        log_path: log_path.to_string_lossy().to_string(),
+    })
+}
+
+#[tauri::command]
+pub async fn set_runtime_logging_enabled(
+    request: SetRuntimeLoggingRequest,
+    app_handle: tauri::AppHandle,
+) -> Result<RuntimeLoggingStatusResponse, String> {
+    let log_path = crate::resolve_runtime_log_path(&app_handle)?;
+
+    if request.enabled {
+        crate::set_runtime_file_logging_enabled(true);
+        info!("runtime file logging enabled path={}", log_path.display());
+    } else {
+        info!("runtime file logging disabled path={}", log_path.display());
+        crate::set_runtime_file_logging_enabled(false);
+    }
+
+    Ok(RuntimeLoggingStatusResponse {
+        enabled: request.enabled,
+        log_path: log_path.to_string_lossy().to_string(),
+    })
 }

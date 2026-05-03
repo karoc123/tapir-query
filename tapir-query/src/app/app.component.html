@@ -164,7 +164,9 @@
     [options]="themeOptions()"
     [version]="appVersion()"
     [runtimeLogPath]="appRuntimeLogPath()"
+    [runtimeLoggingEnabled]="runtimeLoggingEnabled()"
     (closeRequested)="closeSettings()"
+    (runtimeLoggingToggled)="onRuntimeLoggingToggled($event)"
     (themeSelected)="onThemeSelected($event)"
   />
 </main>
