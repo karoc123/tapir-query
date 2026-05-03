@@ -576,6 +576,7 @@ export class QueryService {
         loading: false,
         showSlowLoadHint: false,
         queryError: parsed,
+        effectiveSql: null,
         statusMessage: "Query execution failed.",
       });
       this.clearSlowLoadTimer();

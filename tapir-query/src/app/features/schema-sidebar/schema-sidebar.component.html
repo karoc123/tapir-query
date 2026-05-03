@@ -11,10 +11,17 @@
     @if (columns().length === 0) {
       <p class="schema-empty">Load a CSV to inspect inferred columns.</p>
     } @else {
-      <ul class="column-list">
+      <ul
+        class="column-list"
+        cdkDropList
+        [id]="analysisColumnSourceDropListId"
+        [cdkDropListData]="columns()"
+        [cdkDropListConnectedTo]="[analysisColumnTargetDropListId]"
+        [cdkDropListSortingDisabled]="true"
+      >
         @for (column of columns(); track column.name) {
           <li>
-            <button type="button" class="column-item" [title]="'Insert ' + column.name" draggable="true" (dragstart)="onColumnDragStart($event, column)" (click)="selectColumn(column.name)">
+            <button type="button" class="column-item" [title]="'Insert ' + column.name" cdkDrag [cdkDragData]="column" (click)="selectColumn(column.name)">
               <span class="column-name">{{ column.name }}</span>
               <span class="column-type">{{ column.dataType }}</span>
             </button>

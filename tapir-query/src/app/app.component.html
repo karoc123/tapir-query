@@ -158,5 +158,12 @@
 
   <app-cheat-sheet [open]="cheatSheetOpen()" (closeRequested)="closeCheatSheet()" />
 
-  <app-settings-panel [open]="settingsOpen()" [activeTheme]="activeTheme()" [options]="themeOptions()" (closeRequested)="closeSettings()" (themeSelected)="onThemeSelected($event)" />
+  <app-settings-panel
+    [open]="settingsOpen()"
+    [activeTheme]="activeTheme()"
+    [options]="themeOptions()"
+    [version]="appVersion()"
+    (closeRequested)="closeSettings()"
+    (themeSelected)="onThemeSelected($event)"
+  />
 </main>

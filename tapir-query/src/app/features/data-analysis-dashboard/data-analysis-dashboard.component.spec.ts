@@ -8,7 +8,7 @@ describe("DataAnalysisDashboardComponent", () => {
     }).compileComponents();
   });
 
-  it("uses text/plain as fallback for dropped column names", () => {
+  it("emits dropped columns from schema payloads", () => {
     const fixture = TestBed.createComponent(DataAnalysisDashboardComponent);
     const component = fixture.componentInstance;
     const emitted: Array<{ columnName: string; dataType: string | null }> = [];
@@ -17,68 +17,33 @@ describe("DataAnalysisDashboardComponent", () => {
     component.columnDropped.subscribe((payload) => emitted.push(payload));
     fixture.detectChanges();
 
-    const transfer = {
-      files: { length: 0 },
-      getData: (type: string) => {
-        if (type === "text/plain") {
-          return "amount";
-        }
-
-        return "";
-      },
-    } as unknown as DataTransfer;
-
-    component.onDropZoneDrop({
-      preventDefault: () => undefined,
-      dataTransfer: transfer,
-    } as unknown as DragEvent);
+    component.onDropZoneDrop({ name: "amount", dataType: "DOUBLE" });
 
     expect(emitted).toEqual([
       {
         columnName: "amount",
-        dataType: null,
+        dataType: "DOUBLE",
       },
     ]);
   });
 
-  it("keeps the drop zone active across nested drag transitions without relatedTarget", () => {
+  it("activates and deactivates the drop zone for column payloads", () => {
     const fixture = TestBed.createComponent(DataAnalysisDashboardComponent);
     const component = fixture.componentInstance;
 
     fixture.componentRef.setInput("columns", []);
     fixture.detectChanges();
 
-    const container = document.createElement("div");
-    const transfer = {
-      files: { length: 0 },
-      types: ["Text"],
-      getData: () => "",
-    } as unknown as DataTransfer;
-
-    component.onDropZoneDragEnter({
-      preventDefault: () => undefined,
-      dataTransfer: transfer,
-    } as unknown as DragEvent);
-    component.onDropZoneDragEnter({
-      preventDefault: () => undefined,
-      dataTransfer: transfer,
-    } as unknown as DragEvent);
-    component.onDropZoneDragLeave({
-      currentTarget: container,
-      relatedTarget: null,
-    } as unknown as DragEvent);
+    component.onDropZoneDragEnter({ name: "country", dataType: "VARCHAR" });
 
     expect(component.dropActive()).toBe(true);
 
-    component.onDropZoneDragLeave({
-      currentTarget: container,
-      relatedTarget: null,
-    } as unknown as DragEvent);
+    component.onDropZoneDragLeave({ name: "country", dataType: "VARCHAR" });
 
     expect(component.dropActive()).toBe(false);
   });
 
-  it("uses legacy Text payload as a Windows fallback", () => {
+  it("ignores unsupported payloads", () => {
     const fixture = TestBed.createComponent(DataAnalysisDashboardComponent);
     const component = fixture.componentInstance;
     const emitted: Array<{ columnName: string; dataType: string | null }> = [];
@@ -87,27 +52,10 @@ describe("DataAnalysisDashboardComponent", () => {
     component.columnDropped.subscribe((payload) => emitted.push(payload));
     fixture.detectChanges();
 
-    const transfer = {
-      files: { length: 0 },
-      getData: (type: string) => {
-        if (type === "Text") {
-          return "country";
-        }
+    component.onDropZoneDragEnter({ foo: "bar" });
+    component.onDropZoneDrop({ foo: "bar" });
 
-        return "";
-      },
-    } as unknown as DataTransfer;
-
-    component.onDropZoneDrop({
-      preventDefault: () => undefined,
-      dataTransfer: transfer,
-    } as unknown as DragEvent);
-
-    expect(emitted).toEqual([
-      {
-        columnName: "country",
-        dataType: null,
-      },
-    ]);
+    expect(component.dropActive()).toBe(false);
+    expect(emitted).toEqual([]);
   });
 });

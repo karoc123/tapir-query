@@ -17,11 +17,15 @@
 
   <div
     class="analysis-content"
+    cdkDropList
+    id="tapir-analysis-drop-target"
+    [cdkDropListData]="columns()"
+    [cdkDropListConnectedTo]="connectedDropListIds"
+    [cdkDropListSortingDisabled]="true"
     [class.drag-active]="dropActive()"
-    (dragenter)="onDropZoneDragEnter($event)"
-    (dragover)="onDropZoneDragOver($event)"
-    (dragleave)="onDropZoneDragLeave($event)"
-    (drop)="onDropZoneDrop($event)"
+    (cdkDropListEntered)="onDropZoneDragEnter($event.item.data)"
+    (cdkDropListExited)="onDropZoneDragLeave($event.item.data)"
+    (cdkDropListDropped)="onDropZoneDrop($event.item.data)"
   >
     @if (columns().length === 0) {
       <div class="analysis-empty-state">

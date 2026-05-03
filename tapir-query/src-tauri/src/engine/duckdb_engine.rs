@@ -188,6 +188,13 @@ impl DuckDbEngine {
         Ok(columns)
     }
 
+    fn validate_query_sql(&self, connection: &Connection, sql: &str) -> EngineResult<()> {
+        connection
+            .prepare(sql)
+            .map(|_| ())
+            .map_err(|error| AppError::Sql(format!("failed to validate query: {error}")))
+    }
+
     fn normalize_sql(&self, sql: &str) -> String {
         sql.trim().trim_end_matches(';').trim().to_string()
     }
@@ -462,6 +469,11 @@ impl CsvQueryEngine for DuckDbEngine {
             return Err(AppError::Validation(String::from("query cannot be empty")));
         }
 
+        let normalized_sql = self.normalize_sql(sql);
+        if normalized_sql.is_empty() {
+            return Err(AppError::Validation(String::from("query cannot be empty")));
+        }
+
         let bounded_limit = limit.clamp(1, 2_000);
         debug!(
             "execute_query_chunk limit={} offset={} bounded_limit={}",
@@ -470,11 +482,12 @@ impl CsvQueryEngine for DuckDbEngine {
 
         self.with_connection(registered, |connection| {
             let start = Instant::now();
+            self.validate_query_sql(connection, &normalized_sql)?;
             debug!("execute_query_chunk describing query schema");
-            let columns = self.describe_query_schema(connection, sql)?;
+            let columns = self.describe_query_schema(connection, &normalized_sql)?;
 
             let paged_sql =
-                sql_builder::build_paged_select_sql(sql, &columns, bounded_limit + 1, offset);
+                sql_builder::build_paged_select_sql(&normalized_sql, &columns, bounded_limit + 1, offset);
             debug!("execute_query_chunk preparing paged query");
             let mut statement = connection
                 .prepare(&paged_sql)
@@ -542,6 +555,7 @@ impl CsvQueryEngine for DuckDbEngine {
 
         let started = Instant::now();
         let (columns, total_rows) = self.with_connection(registered, |connection| {
+            self.validate_query_sql(connection, &normalized_sql)?;
             let columns = self.describe_query_schema(connection, &normalized_sql)?;
             let count_sql = sql_builder::build_count_sql(&normalized_sql);
             let total_rows: i64 = connection
@@ -686,6 +700,13 @@ impl CsvQueryEngine for DuckDbEngine {
             )));
         }
 
+        let normalized_sql = self.normalize_sql(sql);
+        if normalized_sql.is_empty() {
+            return Err(AppError::Validation(String::from(
+                "query cannot be empty for export",
+            )));
+        }
+
         let target_path = PathBuf::from(output_path);
         if let Some(parent) = target_path.parent() {
             std::fs::create_dir_all(parent).map_err(|error| {
@@ -698,12 +719,13 @@ impl CsvQueryEngine for DuckDbEngine {
 
         self.with_connection(registered, |connection| {
             debug!("export_query_to_csv output_path={}", output_path);
-            let count_sql = sql_builder::build_count_sql(sql);
+            self.validate_query_sql(connection, &normalized_sql)?;
+            let count_sql = sql_builder::build_count_sql(&normalized_sql);
             let rows_written: i64 = connection
                 .query_row(&count_sql, [], |row| row.get(0))
                 .map_err(|error| AppError::Sql(format!("failed to count export rows: {error}")))?;
 
-            let export_sql = sql_builder::build_export_csv_sql(sql, output_path);
+            let export_sql = sql_builder::build_export_csv_sql(&normalized_sql, output_path);
             connection
                 .execute_batch(&export_sql)
                 .map_err(|error| AppError::Sql(format!("failed to export CSV: {error}")))?;
@@ -741,6 +763,8 @@ impl CsvQueryEngine for DuckDbEngine {
 
         self.with_connection(registered, |connection| {
             let started = Instant::now();
+
+            self.validate_query_sql(connection, &normalized_sql)?;
 
             // Profiling runs in background and may overlap with interactive query commands.
             // Keep a conservative DuckDB thread count per profiling task to reduce contention.
@@ -909,6 +933,54 @@ mod tests {
             .expect_err("invalid sql should fail");
 
         assert!(matches!(error, AppError::Sql(_)));
+
+        let _ = std::fs::remove_file(csv_path);
+    }
+
+    #[test]
+    fn returns_sql_error_for_nonsense_query_text() {
+        let csv_path = make_temp_csv("id,name\n1,alice\n");
+        let engine = DuckDbEngine::new(2);
+        let mut registered = HashMap::new();
+
+        let table = engine
+            .register_csv(&registered, csv_path.to_string_lossy().as_ref())
+            .expect("register CSV");
+        registered.insert(table.table_name.clone(), table);
+
+        let error = engine
+            .execute_query_chunk(&registered, "asdf", 100, 0)
+            .expect_err("nonsense sql should fail");
+
+        assert!(matches!(error, AppError::Sql(_)));
+        assert!(error.to_string().contains("asdf"));
+
+        let _ = std::fs::remove_file(csv_path);
+    }
+
+    #[test]
+    fn run_column_profile_metric_returns_sql_error_for_invalid_query() {
+        let csv_path = make_temp_csv("id,name\n1,alice\n");
+        let engine = DuckDbEngine::new(1);
+        let mut registered = HashMap::new();
+
+        let table = engine
+            .register_csv(&registered, csv_path.to_string_lossy().as_ref())
+            .expect("register CSV");
+        registered.insert(table.table_name.clone(), table);
+
+        let error = engine
+            .run_column_profile_metric(
+                &registered,
+                "asdf",
+                "name",
+                ColumnProfileMetricKind::CompletenessAudit,
+                None,
+            )
+            .expect_err("invalid profile sql should fail");
+
+        assert!(matches!(error, AppError::Sql(_)));
+        assert!(error.to_string().contains("asdf"));
 
         let _ = std::fs::remove_file(csv_path);
     }

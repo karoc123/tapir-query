@@ -11,16 +11,19 @@
       <p class="section-title">Theme</p>
       <div class="theme-grid">
         @for (option of options(); track option.id) {
-          <button
-            type="button"
-            class="theme-card"
-            [class.active]="option.id === activeTheme()"
-            (click)="selectTheme(option.id)"
-          >
+          <button type="button" class="theme-card" [class.active]="option.id === activeTheme()" (click)="selectTheme(option.id)">
             <span class="theme-name">{{ option.label }}</span>
             <span class="theme-description">{{ option.description }}</span>
           </button>
         }
+      </div>
+    </section>
+
+    <section class="app-meta-section">
+      <p class="section-title">App</p>
+      <div class="app-meta-card">
+        <span class="app-meta-label">Version</span>
+        <span class="app-meta-value">{{ version() ?? "unknown" }}</span>
       </div>
     </section>
   </aside>

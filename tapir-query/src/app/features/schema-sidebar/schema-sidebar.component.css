@@ -83,6 +83,15 @@
   cursor: grabbing;
 }
 
+.column-item.cdk-drag-dragging {
+  cursor: grabbing;
+  opacity: 0.92;
+}
+
+.column-list.cdk-drop-list-dragging .column-item:not(.cdk-drag-placeholder) {
+  transition: transform 160ms ease;
+}
+
 .column-name {
   font-size: 0.72rem;
   font-weight: 700;

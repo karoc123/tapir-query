@@ -68,6 +68,7 @@ describe("QueryService", () => {
 
     expect(historyService.entries().length).toBe(baselineEntries);
     expect(historyService.entries().some((entry) => entry.sql === "SELECT FROM")).toBe(false);
+    expect(service.effectiveSql()).toBeNull();
   });
 
   it("uses direct preview execution when opening a file", async () => {

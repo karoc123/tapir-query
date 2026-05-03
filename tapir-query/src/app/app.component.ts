@@ -17,6 +17,7 @@ import { QueryErrorPanelComponent } from "./features/query-error-panel/query-err
 import { SchemaSidebarComponent } from "./features/schema-sidebar/schema-sidebar.component";
 import { SettingsPanelComponent } from "./features/settings-panel/settings-panel.component";
 import { SqlEditorComponent } from "./features/sql-editor/sql-editor.component";
+import { AppInfoService } from "./infrastructure/app-info.service";
 import { LayoutStateService } from "./infrastructure/layout-state.service";
 import { LogService } from "./infrastructure/log.service";
 import { PerfService } from "./infrastructure/perf.service";
@@ -49,6 +50,7 @@ export class AppComponent implements OnDestroy {
   private readonly datasetMetricsService = inject(DatasetMetricsService);
   private readonly ingestionService = inject(IngestionService);
   private readonly layoutState = inject(LayoutStateService);
+  private readonly appInfoService = inject(AppInfoService);
   private readonly logsService = inject(LogService);
   private readonly perfService = inject(PerfService);
   private readonly themeService = inject(ThemeService);
@@ -92,6 +94,7 @@ export class AppComponent implements OnDestroy {
   readonly activeTheme = this.themeService.theme;
   readonly settingsOpen = this.themeService.settingsOpen;
   readonly themeOptions = this.themeService.options;
+  readonly appVersion = this.appInfoService.version;
   readonly defaultExportPath = "exports/query-results.csv";
   readonly totalCountPending = computed(() => this.datasetMetricsService.hasActiveSignature() && this.datasetMetricsService.totalPending());
 
@@ -229,8 +232,12 @@ export class AppComponent implements OnDestroy {
     this.dataAnalysisPluginService.disable();
   }
 
-  onFileDropped(filePath: string): Promise<void> {
-    return this.queryService.openFile(filePath);
+  async onFileDropped(filePath: string): Promise<void> {
+    try {
+      await this.queryService.openFile(filePath);
+    } catch (error) {
+      this.handleUnhandledQueryFailure("open-file", error);
+    }
   }
 
   onDropError(message: string): void {
@@ -253,6 +260,8 @@ export class AppComponent implements OnDestroy {
   async runQuery(): Promise<void> {
     try {
       await this.queryService.runQuery();
+    } catch (error) {
+      this.handleUnhandledQueryFailure("query", error);
     } finally {
       this.focusQueryEditorSoon();
     }
@@ -329,8 +338,12 @@ export class AppComponent implements OnDestroy {
     }
   }
 
-  onTableSortRequested(request: TableSortRequest): Promise<void> {
-    return this.queryService.sortByEntireTableColumn(request.column, request.direction);
+  async onTableSortRequested(request: TableSortRequest): Promise<void> {
+    try {
+      await this.queryService.sortByEntireTableColumn(request.column, request.direction);
+    } catch (error) {
+      this.handleUnhandledQueryFailure("query-sort", error);
+    }
   }
 
   onTableFilterRequested(intent: FilterIntent): void {
@@ -622,5 +635,13 @@ export class AppComponent implements OnDestroy {
     setTimeout(() => {
       this.sqlEditor?.focusEditor();
     }, 0);
+  }
+
+  private handleUnhandledQueryFailure(source: string, error: unknown): void {
+    const message = this.extractError(error);
+    this.logsService.error(source, "Unhandled query UI failure", {
+      error: message,
+    });
+    this.queryService.reportError(message);
   }
 }

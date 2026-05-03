@@ -1,7 +1,8 @@
+import { DragDropModule } from "@angular/cdk/drag-drop";
 import { CommonModule } from "@angular/common";
 import { Component, input, output, signal } from "@angular/core";
 import { CardinalityMetricView, ColumnAnalysisProfile } from "../../domain/data-analysis-plugin.service";
-import { CompletenessAudit, StringLengthHistogram } from "../../infrastructure/tauri-contracts";
+import { ColumnSchema, CompletenessAudit, StringLengthHistogram } from "../../infrastructure/tauri-contracts";
 
 interface AnalysisColumnDropPayload {
   columnName: string;
@@ -10,12 +11,13 @@ interface AnalysisColumnDropPayload {
 
 @Component({
   selector: "app-data-analysis-dashboard",
-  imports: [CommonModule],
+  imports: [CommonModule, DragDropModule],
   templateUrl: "./data-analysis-dashboard.component.html",
   styleUrl: "./data-analysis-dashboard.component.css",
 })
 export class DataAnalysisDashboardComponent {
-  private readonly acceptedTransferTypes = ["application/x-tapir-column-name", "text/x-tapir-column-name", "text/plain", "Text"];
+  readonly analysisColumnSourceDropListId = "tapir-analysis-column-source";
+  readonly connectedDropListIds = [this.analysisColumnSourceDropListId];
 
   readonly columns = input.required<ColumnAnalysisProfile[]>();
   readonly running = input(false);
@@ -25,7 +27,6 @@ export class DataAnalysisDashboardComponent {
   readonly columnRemoved = output<string>();
 
   private readonly dragActive = signal(false);
-  private dragDepth = 0;
 
   readonly dropActive = this.dragActive.asReadonly();
 
@@ -65,59 +66,33 @@ export class DataAnalysisDashboardComponent {
     return `${Math.max(0, Math.min(100, (value / maxValue) * 100)).toFixed(1)}%`;
   }
 
-  onDropZoneDragEnter(event: DragEvent): void {
-    if (!this.hasSupportedColumnTransfer(event.dataTransfer)) {
+  onDropZoneDragEnter(data: unknown): void {
+    if (this.toDroppedColumn(data) === null) {
       return;
     }
 
-    event.preventDefault();
-    this.dragDepth += 1;
     this.dragActive.set(true);
   }
 
-  onDropZoneDragOver(event: DragEvent): void {
-    if (!this.hasSupportedColumnTransfer(event.dataTransfer)) {
+  onDropZoneDragLeave(data: unknown): void {
+    if (this.toDroppedColumn(data) === null) {
       return;
     }
 
-    event.preventDefault();
-    if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = "copy";
-    }
-    this.dragActive.set(true);
+    this.dragActive.set(false);
   }
 
-  onDropZoneDragLeave(event: DragEvent): void {
-    const target = event.currentTarget as HTMLElement | null;
-    const relatedTarget = event.relatedTarget as Node | null;
-    if (target && relatedTarget && target.contains(relatedTarget)) {
+  onDropZoneDrop(data: unknown): void {
+    this.dragActive.set(false);
+
+    const column = this.toDroppedColumn(data);
+    if (column === null) {
       return;
     }
 
-    this.dragDepth = Math.max(0, this.dragDepth - 1);
-    if (this.dragDepth === 0) {
-      this.dragActive.set(false);
-    }
-  }
-
-  onDropZoneDrop(event: DragEvent): void {
-    event.preventDefault();
-    this.resetDragState();
-
-    const transfer = event.dataTransfer;
-    if (!transfer || transfer.files.length > 0) {
-      return;
-    }
-
-    const columnName = this.readTransferData(transfer, this.acceptedTransferTypes);
-    if (!columnName) {
-      return;
-    }
-
-    const dataType = this.readTransferData(transfer, ["application/x-tapir-column-type", "text/x-tapir-column-type"]);
     this.columnDropped.emit({
-      columnName,
-      dataType: dataType || null,
+      columnName: column.columnName,
+      dataType: column.dataType,
     });
   }
 
@@ -125,38 +100,28 @@ export class DataAnalysisDashboardComponent {
     this.columnRemoved.emit(columnName);
   }
 
-  private hasSupportedColumnTransfer(transfer: DataTransfer | null): boolean {
-    if (!transfer) {
+  private toDroppedColumn(data: unknown): AnalysisColumnDropPayload | null {
+    if (!this.isColumnSchema(data)) {
+      return null;
+    }
+
+    const columnName = data.name.trim();
+    if (!columnName) {
+      return null;
+    }
+
+    return {
+      columnName,
+      dataType: data.dataType,
+    };
+  }
+
+  private isColumnSchema(data: unknown): data is ColumnSchema {
+    if (typeof data !== "object" || data === null) {
       return false;
     }
 
-    const transferTypes = transfer.types;
-    if (!transferTypes || transferTypes.length === 0) {
-      return true;
-    }
-
-    for (let index = 0; index < transferTypes.length; index += 1) {
-      if (this.acceptedTransferTypes.includes(transferTypes[index])) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  private resetDragState(): void {
-    this.dragDepth = 0;
-    this.dragActive.set(false);
-  }
-
-  private readTransferData(transfer: DataTransfer, types: string[]): string {
-    for (const type of types) {
-      const value = transfer.getData(type).trim();
-      if (value) {
-        return value;
-      }
-    }
-
-    return "";
+    const record = data as Record<string, unknown>;
+    return typeof record["name"] === "string" && typeof record["dataType"] === "string";
   }
 }

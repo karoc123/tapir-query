@@ -1,3 +1,4 @@
+import { DragDropModule } from "@angular/cdk/drag-drop";
 import { CommonModule } from "@angular/common";
 import { Component, input, output } from "@angular/core";
 import { ColumnSchema } from "../../infrastructure/tauri-contracts";
@@ -5,11 +6,14 @@ import { ColumnSchema } from "../../infrastructure/tauri-contracts";
 @Component({
   selector: "app-schema-sidebar",
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, DragDropModule],
   templateUrl: "./schema-sidebar.component.html",
   styleUrl: "./schema-sidebar.component.css",
 })
 export class SchemaSidebarComponent {
+  readonly analysisColumnSourceDropListId = "tapir-analysis-column-source";
+  readonly analysisColumnTargetDropListId = "tapir-analysis-drop-target";
+
   readonly tableName = input<string | null>(null);
   readonly filePath = input<string | null>(null);
   readonly columns = input<ColumnSchema[]>([]);
@@ -19,20 +23,5 @@ export class SchemaSidebarComponent {
 
   selectColumn(columnName: string): void {
     this.columnSelected.emit(columnName);
-  }
-
-  onColumnDragStart(event: DragEvent, column: ColumnSchema): void {
-    const transfer = event.dataTransfer;
-    if (!transfer) {
-      return;
-    }
-
-    transfer.effectAllowed = "copy";
-    transfer.setData("application/x-tapir-column-name", column.name);
-    transfer.setData("application/x-tapir-column-type", column.dataType);
-    transfer.setData("text/x-tapir-column-name", column.name);
-    transfer.setData("text/x-tapir-column-type", column.dataType);
-    transfer.setData("text/plain", column.name);
-    transfer.setData("Text", column.name);
   }
 }
