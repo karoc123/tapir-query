@@ -355,6 +355,11 @@
   white-space: nowrap;
 }
 
+.status-bar .status-row-limit {
+  color: var(--tapir-error-text);
+  font-weight: 700;
+}
+
 .status-loading-indicator {
   display: inline-block;
   width: 0.62rem;

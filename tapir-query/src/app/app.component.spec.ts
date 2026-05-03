@@ -55,6 +55,28 @@ describe("AppComponent", () => {
     expect(component.rowStatusLabel()).toMatch(/Row|Rows|of/);
   });
 
+  it("shows a red LIMIT marker in the status bar when the executed query is capped by LIMIT", async () => {
+    bridgeMock.executeQueryResults.push({
+      ...bridgeMock.queryResult,
+      rows: Array.from({ length: 1000 }, (_, index) => ({
+        amount: String(index + 1),
+        currency: "EUR",
+      })),
+      limit: 1000,
+      nextOffset: null,
+    });
+
+    const fixture = TestBed.createComponent(AppComponent);
+    const component = fixture.componentInstance;
+
+    await component.onFileDropped("/tmp/transactions.csv");
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    await Promise.resolve();
+
+    expect(component.statusBarRowLabel()).toBe("(1,000 LIMIT)");
+    expect(component.statusBarRowLabelIsLimited()).toBe(true);
+  });
+
   it("prevents query execution before a file is loaded", async () => {
     const fixture = TestBed.createComponent(AppComponent);
     const component = fixture.componentInstance;

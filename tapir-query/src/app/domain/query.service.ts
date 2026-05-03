@@ -97,6 +97,10 @@ export class QueryService {
   readonly statusMessage = computed(() => this.state().statusMessage);
   readonly lastQueryElapsedMs = computed(() => this.state().lastQueryElapsedMs);
   readonly effectiveSql = computed(() => this.state().effectiveSql);
+  readonly effectiveLimit = computed(() => {
+    const sql = this.state().effectiveSql;
+    return sql === null ? null : this.sqlGenerator.readTopLevelLimit(sql);
+  });
   readonly activeSortColumn = computed(() => this.state().activeSortColumn);
   readonly activeSortDirection = computed(() => this.state().activeSortDirection);
   readonly hasActiveSession = computed(() => this.state().activeSessionId !== null);
@@ -829,7 +833,7 @@ export class QueryService {
 
   private buildPreviewQuery(sql: string): string {
     const normalized = sql.trim().replace(/;+\s*$/, "");
-    if (/\blimit\s+\d+\b/i.test(normalized)) {
+    if (this.sqlGenerator.readTopLevelLimit(normalized) !== null) {
       return normalized;
     }
 

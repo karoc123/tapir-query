@@ -6,6 +6,18 @@ describe("SqlGeneratorService", () => {
     TestBed.configureTestingModule({});
   });
 
+  it("reads a top-level LIMIT value", () => {
+    const service = TestBed.inject(SqlGeneratorService);
+
+    expect(service.readTopLevelLimit("SELECT * FROM transactions LIMIT 1000")).toBe(1000);
+  });
+
+  it("ignores nested LIMIT clauses when reading the active query limit", () => {
+    const service = TestBed.inject(SqlGeneratorService);
+
+    expect(service.readTopLevelLimit("SELECT * FROM (SELECT * FROM transactions LIMIT 10) t ORDER BY amount DESC")).toBeNull();
+  });
+
   it("inserts ORDER BY before a top-level LIMIT clause", () => {
     const service = TestBed.inject(SqlGeneratorService);
 

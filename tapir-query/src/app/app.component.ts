@@ -74,6 +74,7 @@ export class AppComponent implements OnDestroy {
   readonly totalRowCount = this.queryService.totalRowCount;
   readonly windowStartOffset = this.queryService.windowStartOffset;
   readonly effectiveSql = this.queryService.effectiveSql;
+  readonly effectiveLimit = this.queryService.effectiveLimit;
   readonly lastQueryElapsedMs = this.queryService.lastQueryElapsedMs;
   readonly statusMessage = this.queryService.statusMessage;
   readonly showSlowLoadHint = this.queryService.showSlowLoadHint;
@@ -120,6 +121,20 @@ export class AppComponent implements OnDestroy {
     }
 
     return `${visibleRows.toLocaleString()} ${visibleRows === 1 ? "Row" : "Rows"}`;
+  });
+
+  readonly statusBarRowLabelIsLimited = computed(() => {
+    const limit = this.effectiveLimit();
+    return limit !== null && this.rows().length >= limit;
+  });
+
+  readonly statusBarRowLabel = computed(() => {
+    const limit = this.effectiveLimit();
+    if (limit !== null && this.rows().length >= limit) {
+      return `(${limit.toLocaleString()} LIMIT)`;
+    }
+
+    return this.rowStatusLabel();
   });
 
   readonly queryElapsedLabel = computed(() => {

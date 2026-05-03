@@ -23,6 +23,33 @@ interface ClausePositions {
   providedIn: "root",
 })
 export class SqlGeneratorService {
+  readTopLevelLimit(sql: string): number | null {
+    const trimmed = sql.trim();
+    if (trimmed.length === 0) {
+      return null;
+    }
+
+    const { core } = this.splitSqlTerminator(trimmed);
+    if (core.length === 0) {
+      return null;
+    }
+
+    const positions = this.findTopLevelClauses(core);
+    if (positions.limit === null) {
+      return null;
+    }
+
+    const limitClauseEnd = this.firstClauseAfter(positions.limit, [positions.offset, positions.fetch], core.length);
+    const limitClause = core.slice(positions.limit, limitClauseEnd).trim();
+    const match = /^limit\s+(\d+)\b/i.exec(limitClause);
+    if (!match) {
+      return null;
+    }
+
+    const parsed = Number.parseInt(match[1], 10);
+    return Number.isSafeInteger(parsed) ? parsed : null;
+  }
+
   withOrderBy(sql: string, columnName: string, direction: SqlSortDirection, fallbackTableName: string): string {
     const normalized = this.normalizeInputSql(sql, fallbackTableName);
     const { core, hadTerminator } = this.splitSqlTerminator(normalized);

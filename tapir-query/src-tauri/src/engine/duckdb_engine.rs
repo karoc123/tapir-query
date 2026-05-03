@@ -482,7 +482,9 @@ impl CsvQueryEngine for DuckDbEngine {
 
         self.with_connection(registered, |connection| {
             let start = Instant::now();
-            self.validate_query_sql(connection, &normalized_sql)?;
+            // Let schema discovery be the first validation step. This keeps the
+            // direct query path on the same error-mapping surface while avoiding
+            // an extra low-level prepare call before invalid SQL is reported.
             debug!("execute_query_chunk describing query schema");
             let columns = self.describe_query_schema(connection, &normalized_sql)?;
 

@@ -145,8 +145,8 @@
 
       <footer class="zone-d status-bar">
         <span>{{ statusMessage() }}</span>
-        <span aria-live="polite">
-          {{ rowStatusLabel() }}
+        <span aria-live="polite" [class.status-row-limit]="statusBarRowLabelIsLimited()">
+          {{ statusBarRowLabel() }}
           @if (totalCountPending()) {
             <span class="status-loading-indicator" aria-hidden="true"></span>
           }
