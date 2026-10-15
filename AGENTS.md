@@ -2,9 +2,9 @@
 
 This file is the operating guide for coding agents working in this repository.
 
-## Session Snapshot (April 2026)
+## Session Snapshot (October 2026)
 
-- Frontend is Angular 22 + Signals, backend is Tauri v2 + Rust + DuckDB.
+- Frontend is Angular 22 + Signals (zoneless, no `zone.js`), backend is Tauri v2 + Rust (edition 2024) + DuckDB.
 - Phase 5 context-first UI is in place:
   - Empty mode: centered drop zone + Browse Files CTA only.
   - Loaded mode: Zone A action bar, Zone B collapsible schema sidebar, Zone C data grid, Zone D status bar.
@@ -57,7 +57,7 @@ From `tapir-query/`:
 
 - Keep components presentational where possible.
 - Put UI transitions and business behavior in services with Signals.
-- All components use `ChangeDetectionStrategy.OnPush`: keep view state in Signals (`input()`, `signal()`, `computed()`, `viewChild()`), update state immutably, and prefer `host` metadata over `@HostBinding`/`@HostListener`.
+- The app is zoneless and all components use `ChangeDetectionStrategy.OnPush`: keep view state in Signals (`input()`, `signal()`, `computed()`, `viewChild()`), update state immutably, and prefer `host` metadata over `@HostBinding`/`@HostListener`.
 - Do not couple components directly to DuckDB details.
 - For error output, always render parsed summaries/context, never raw JSON payloads.
 
@@ -89,6 +89,7 @@ Run the narrowest test set that proves the change, then run broader checks:
 ## Known Pitfalls
 
 - Do not run Jest with `pnpm test -- --runInBand`; Jest may treat it as a file pattern and report no tests found.
+- Tests run zoneless (`setupZonelessTestEnv`): flush effects with `TestBed.tick()` (not the deprecated `flushEffects()`), and await a macrotask rather than a single `Promise.resolve()` when asserting on chained async work.
 - In strict TypeScript with index signatures, use bracket access (`obj["field"]`) instead of dot access.
 - On Linux Snap environments, GLIBC conflicts can break `tauri dev` unless these vars are sanitized:
   - `LD_LIBRARY_PATH`

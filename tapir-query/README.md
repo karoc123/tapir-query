@@ -54,7 +54,7 @@ cargo test
 
 ## Notes
 
-- The frontend uses Standalone Angular components and Signals.
+- The frontend uses Standalone Angular components and Signals, runs zoneless (no `zone.js`), and all components use OnPush.
 - Frontend dependencies are migrated to Angular 22 (TypeScript is pinned to 6.0.x, as required by Angular 22).
 - IPC access is isolated in `src/app/infrastructure/tauri-bridge.service.ts`.
 - UI orchestration lives in `src/app/domain/file.service.ts` and `src/app/domain/query.service.ts`.

@@ -99,6 +99,8 @@ All command handlers are async wrappers around blocking work.
 
 ## 4. Frontend Architecture (Angular 22 + Signals)
 
+The app runs zoneless (`provideZonelessChangeDetection()`, no `zone.js`) and every component uses `ChangeDetectionStrategy.OnPush`. Rendering is driven only by Signal updates, template events, and outputs, so any state a template reads must live in a Signal; plain fields are reserved for internal bookkeeping (timers, request tokens).
+
 ### 4.1 Module Layout
 
 ```text

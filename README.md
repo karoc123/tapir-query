@@ -2,9 +2,11 @@
 
 Tapir Query is a desktop-first CSV analysis tool focused on auditability, speed, and local execution.
 
-Built with Tauri v2, Rust, DuckDB, and Angular 22 (Standalone + Signals), it provides an SQL-native workflow without sending data to external services.
+Built with Tauri v2, Rust, DuckDB, and Angular 22 (Standalone + Signals, zoneless), it provides an SQL-native workflow without sending data to external services.
 
 ## Quick Start
+
+Prerequisites: Node.js `^22.22.3` or `>=24.15` (Angular 22 requirement; CI uses Node 24), pnpm 10, and Rust `>=1.85` (the backend uses edition 2024).
 
 0. If rust and cargo are not installed, install Rust toolchain:
 
