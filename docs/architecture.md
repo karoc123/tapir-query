@@ -298,14 +298,13 @@ This is functional but not strict least privilege.
 
 ### 10.1 Build Snapshot
 
-- Frontend production build succeeds with CSS budget warnings on:
-  - `app.component.css`
-  - `data-table.component.css`
-- Backend `cargo check` succeeds without warnings.
+- Frontend production build succeeds without budget warnings (initial bundle: about 786 kB; budgets: 850 kB warning / 1.2 MB error, component styles: 8 kB warning / 12 kB error).
+- Frontend tests run zoneless; `pnpm test:typecheck` checks test types separately from Jest's isolated transpilation.
+- Backend tests pass with the locked dependencies. The backend declares Rust 1.90 as its minimum version, matching the current Tauri dependencies.
 
 ### 10.2 Dev Runtime Constraint
 
-- `tauri dev` currently fails config validation if `productName` contains reserved filename characters (for example `:`).
+- `productName` is filesystem-safe (`TapirQuery`); the window title remains `Tapir:Query`. Keep reserved filename characters such as `:` out of `productName` to preserve Tauri config validation.
 
 ### 10.3 Platform Targets
 
@@ -316,12 +315,11 @@ This is functional but not strict least privilege.
 
 Priority actions:
 
-1. Make `productName` config-valid to restore dev runtime boot.
-2. Tighten capabilities to least privilege (especially core scope).
-3. Define production CSP.
-4. Decide streaming policy:
+1. Tighten capabilities to least privilege (especially core scope).
+2. Define production CSP.
+3. Decide streaming policy:
    - remove dormant path, or
    - feature-flag and keep actively tested.
-5. Add session TTL/cap and query cancellation strategy.
+4. Add session TTL/cap and query cancellation strategy.
 
-This reflects the current implemented architecture as of April 30, 2026, including the active direct execution mode.
+This reflects the current implemented architecture as of October 15, 2026, including the active direct execution mode.

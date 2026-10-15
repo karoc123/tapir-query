@@ -2,6 +2,9 @@
   "name": "tapir-query",
   "version": "0.1.0",
   "description": "Tapir:Query desktop SQL workbench for CSV exploration",
+  "engines": {
+    "node": "^22.22.3 || ^24.15.0 || >=26.0.0"
+  },
   "scripts": {
     "ng": "ng",
     "start": "CI=1 ng serve --host 127.0.0.1 --port 1420",
@@ -10,6 +13,8 @@
     "test": "jest --config jest.config.js",
     "test:watch": "jest --config jest.config.js --watch",
     "test:ci": "jest --config jest.config.js --runInBand --coverage",
+    "test:typecheck": "tsc --noEmit -p tsconfig.spec.json",
+    "fixtures:pull": "node tests/fixtures/pull-samples.mjs",
     "test:backend": "pnpm fixtures:pull && cd src-tauri && cargo test",
     "watch": "ng build --watch --configuration development",
     "tauri": "tauri"
@@ -35,9 +40,11 @@
     "@angular/build": "^22.2.2",
     "@angular/cli": "^22.2.2",
     "@angular/compiler-cli": "^22.2.3",
+    "@babel/core": "^7.29.7",
     "@tailwindcss/postcss": "^4.3.3",
     "@tauri-apps/cli": "^2.12.3",
     "@types/jest": "^30.0.0",
+    "@types/node": "^24.19.2",
     "jest": "^30.5.2",
     "jest-environment-jsdom": "^30.5.2",
     "jest-preset-angular": "^17.0.3",

@@ -37,9 +37,12 @@ Frontend:
 
 ```bash
 pnpm test
+pnpm test:typecheck
 ```
 
 Backend + fixture integration:
+
+`pnpm test:backend` downloads the [Datablist samples](https://github.com/datablist/sample-csv-files) (`customers-1000.csv` and `organizations-100.csv`) before running Rust tests. Downloads are cached under `tests/fixtures/downloads/`. Plain `cargo test` skips the optional sample test when its fixture has not been downloaded.
 
 ```bash
 pnpm test:backend
@@ -56,7 +59,9 @@ cargo test
 
 - The frontend uses Standalone Angular components and Signals, runs zoneless (no `zone.js`), and all components use OnPush.
 - Frontend dependencies are migrated to Angular 22 (TypeScript is pinned to 6.0.x, as required by Angular 22).
+- Node.js must satisfy `^22.22.3 || ^24.15.0 || >=26.0.0`; the backend requires Rust 1.90 or newer for the current Tauri dependencies.
 - IPC access is isolated in `src/app/infrastructure/tauri-bridge.service.ts`.
 - UI orchestration lives in `src/app/domain/file.service.ts` and `src/app/domain/query.service.ts`.
 - Backend command handlers are in `src-tauri/src/commands`, orchestration in `src-tauri/src/domain`, and DuckDB engine code in `src-tauri/src/engine`.
 - Unit tests run on Jest (`jest.config.js`, `setup-jest.ts`) instead of Karma/Jasmine.
+- The direct `@babel/core` 7.x dev dependency satisfies Jest's syntax-plugin peers; Angular's builder uses its own Babel 8 dependency.

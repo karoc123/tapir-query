@@ -10,8 +10,8 @@ const targetDir = path.join(__dirname, "downloads");
 
 const samples = [
   {
-    fileName: "customers-100.csv",
-    url: "https://drive.google.com/uc?id=1zO8ekHWx9U7mrbx_0Hoxxu6od7uxJqWw&export=download",
+    fileName: "customers-1000.csv",
+    url: "https://drive.google.com/uc?id=1OT84-j5J5z2tHoUvikJtoJFInWmlyYzY&export=download",
   },
   {
     fileName: "organizations-100.csv",

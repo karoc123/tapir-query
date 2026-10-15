@@ -3,6 +3,7 @@ name = "tapir-query"
 version = "0.1.0"
 description = "Tapir:Query desktop SQL workbench for CSV exploration"
 edition = "2024"
+rust-version = "1.90"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

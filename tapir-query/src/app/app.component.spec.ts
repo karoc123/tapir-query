@@ -103,28 +103,34 @@ describe("AppComponent", () => {
   it("opens CSV files dropped through native Tauri drag-drop events", async () => {
     const fixture = TestBed.createComponent(AppComponent);
     const component = fixture.componentInstance;
-    fixture.detectChanges();
-    await Promise.resolve();
+    await fixture.whenStable();
 
     expect(capturedNativeHandlers?.onFilePath).toBeDefined();
     await capturedNativeHandlers?.onFilePath?.("/tmp/native-drop.csv");
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    await Promise.resolve();
+    await fixture.whenStable();
 
     expect(bridgeMock.openFileCalls).toEqual(["/tmp/native-drop.csv"]);
     expect(component.queryError()).toBeNull();
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector(".empty-layout")).toBeNull();
+    expect(host.querySelector(".loaded-layout")).not.toBeNull();
+    expect(host.querySelector(".table-head-title")?.textContent).toBe("amount");
+    expect(host.querySelector(".cm-content")?.textContent).toBe("SELECT * FROM transactions LIMIT 1000");
   });
 
   it("rejects non-CSV files dropped through native Tauri drag-drop events", async () => {
     const fixture = TestBed.createComponent(AppComponent);
     const component = fixture.componentInstance;
-    fixture.detectChanges();
-    await Promise.resolve();
+    await fixture.whenStable();
 
     expect(capturedNativeHandlers?.onFilePath).toBeDefined();
     await capturedNativeHandlers?.onFilePath?.("/tmp/native-drop.txt");
+    await fixture.whenStable();
 
     expect(bridgeMock.openFileCalls).toEqual([]);
     expect(component.queryError()?.summary).toContain("Only CSV files are supported");
+    const host = fixture.nativeElement as HTMLElement;
+    expect(host.querySelector("[role='alert']")?.textContent).toContain("Only CSV files are supported");
+    expect(host.querySelector(".loaded-layout")).toBeNull();
   });
 });

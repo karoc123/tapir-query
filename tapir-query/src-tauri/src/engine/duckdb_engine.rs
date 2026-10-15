@@ -1013,7 +1013,7 @@ mod tests {
     #[test]
     fn reads_real_world_sample_fixture() {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../tests/fixtures/downloads/customers-100.csv");
+            .join("../tests/fixtures/downloads/customers-1000.csv");
         if !fixture.exists() {
             eprintln!(
                 "skipping real-world fixture test; missing {}",

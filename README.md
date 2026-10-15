@@ -6,7 +6,7 @@ Built with Tauri v2, Rust, DuckDB, and Angular 22 (Standalone + Signals, zoneles
 
 ## Quick Start
 
-Prerequisites: Node.js `^22.22.3` or `>=24.15` (Angular 22 requirement; CI uses Node 24), pnpm 10, and Rust `>=1.85` (the backend uses edition 2024).
+Prerequisites: Node.js `^22.22.3 || ^24.15.0 || >=26.0.0` (Angular 22 requirement; CI uses Node 24), pnpm 10, and Rust `>=1.90` (required by the current Tauri dependencies; the backend uses edition 2024).
 
 0. If rust and cargo are not installed, install Rust toolchain:
 
@@ -89,6 +89,9 @@ Manual release workflow: `.github/workflows/release.yml`
 ```bash
 # frontend tests
 cd tapir-query && pnpm test
+
+# type-check frontend tests
+cd tapir-query && pnpm test:typecheck
 
 # backend tests
 cd tapir-query/src-tauri && cargo test
