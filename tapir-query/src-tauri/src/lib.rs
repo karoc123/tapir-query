@@ -189,7 +189,6 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .manage(AppState::default())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             init_tracing(app.handle());
             install_panic_hook();

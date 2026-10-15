@@ -261,7 +261,6 @@ Current capability (`capabilities/default.json`) grants:
 
 - `core:default`
 - `dialog:default`
-- `opener:default`
 
 This is functional but not strict least privilege.
 
@@ -316,7 +315,7 @@ This is functional but not strict least privilege.
 Priority actions:
 
 1. Make `productName` config-valid to restore dev runtime boot.
-2. Tighten capabilities to least privilege (especially opener/core scope).
+2. Tighten capabilities to least privilege (especially core scope).
 3. Define production CSP.
 4. Decide streaming policy:
    - remove dormant path, or
