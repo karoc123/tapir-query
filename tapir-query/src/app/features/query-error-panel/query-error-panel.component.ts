@@ -1,10 +1,9 @@
 import { CommonModule } from "@angular/common";
-import { Component, input, ChangeDetectionStrategy } from "@angular/core";
+import { ChangeDetectionStrategy, Component, input } from "@angular/core";
 import { ParsedQueryError } from "../../infrastructure/error-parsing.service";
 
 @Component({
   selector: "app-query-error-panel",
-  standalone: true,
   imports: [CommonModule],
   templateUrl: "./query-error-panel.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,

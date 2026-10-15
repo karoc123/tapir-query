@@ -1,11 +1,10 @@
 import { DragDropModule } from "@angular/cdk/drag-drop";
 import { CommonModule } from "@angular/common";
-import { Component, input, output, ChangeDetectionStrategy } from "@angular/core";
+import { ChangeDetectionStrategy, Component, input, output } from "@angular/core";
 import { ColumnSchema } from "../../infrastructure/tauri-contracts";
 
 @Component({
   selector: "app-schema-sidebar",
-  standalone: true,
   imports: [CommonModule, DragDropModule],
   templateUrl: "./schema-sidebar.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,

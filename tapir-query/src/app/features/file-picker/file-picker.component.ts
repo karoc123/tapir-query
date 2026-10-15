@@ -4,7 +4,6 @@ import { LogService } from "../../infrastructure/log.service";
 
 @Component({
   selector: "app-file-picker",
-  standalone: true,
   imports: [CommonModule],
   templateUrl: "./file-picker.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,

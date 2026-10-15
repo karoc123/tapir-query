@@ -37,7 +37,6 @@ const FILTER_OPERATOR_OPTIONS: FilterOperatorOption[] = [
 
 @Component({
   selector: "app-data-table",
-  standalone: true,
   imports: [CommonModule, ScrollingModule],
   templateUrl: "./data-table.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,

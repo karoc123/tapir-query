@@ -1,11 +1,10 @@
 import { CommonModule } from "@angular/common";
-import { Component, computed, input, ChangeDetectionStrategy } from "@angular/core";
+import { ChangeDetectionStrategy, Component, computed, input } from "@angular/core";
 import { ParsedQueryError } from "../../infrastructure/error-parsing.service";
 import { LogEntry } from "../../infrastructure/log.service";
 
 @Component({
   selector: "app-grid-status-overlay",
-  standalone: true,
   imports: [CommonModule],
   templateUrl: "./grid-status-overlay.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -1,10 +1,9 @@
 import { CommonModule } from "@angular/common";
-import { Component, input, output, ChangeDetectionStrategy } from "@angular/core";
+import { ChangeDetectionStrategy, Component, input, output } from "@angular/core";
 import { AppTheme, ThemeOption } from "../../infrastructure/theme.service";
 
 @Component({
   selector: "app-settings-panel",
-  standalone: true,
   imports: [CommonModule],
   templateUrl: "./settings-panel.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,

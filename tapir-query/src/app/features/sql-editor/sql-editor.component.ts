@@ -9,7 +9,6 @@ import { ColumnSchema, QueryHistoryEntry } from "../../infrastructure/tauri-cont
 
 @Component({
   selector: "app-sql-editor",
-  standalone: true,
   imports: [CommonModule],
   templateUrl: "./sql-editor.component.html",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -180,10 +179,6 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.querySyncEffect.destroy();
-    this.loadingSyncEffect.destroy();
-    this.placeholderSyncEffect.destroy();
-    this.schemaSyncEffect.destroy();
     this.editorView?.destroy();
     this.editorView = null;
   }

@@ -3,7 +3,6 @@ import { LogService } from "../../infrastructure/log.service";
 
 @Directive({
   selector: "[tapirDragDrop]",
-  standalone: true,
   host: {
     "[class.drag-active]": "dragActive()",
     "(dragover)": "onDragOver($event)",
