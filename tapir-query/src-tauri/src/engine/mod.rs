@@ -145,7 +145,7 @@ pub trait CsvQueryEngine: Send + Sync {
     ) -> EngineResult<bool>;
 
     fn clear_query_sessions(&self, registered: &HashMap<String, RegisteredCsv>)
-        -> EngineResult<()>;
+    -> EngineResult<()>;
 
     fn export_query_to_csv(
         &self,

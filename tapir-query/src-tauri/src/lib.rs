@@ -12,9 +12,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Once, OnceLock};
 use tauri::{AppHandle, Manager};
 use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::writer::MakeWriterExt;
 use tracing_subscriber::prelude::*;
-use tracing_subscriber::EnvFilter;
 
 static TRACING_INIT: Once = Once::new();
 static PANIC_HOOK_INIT: Once = Once::new();

@@ -9,8 +9,8 @@ use duckdb::Connection;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 use tracing::{debug, error, info};
 
@@ -858,7 +858,7 @@ impl CsvQueryEngine for DuckDbEngine {
 mod tests {
     use super::*;
     use crate::error::AppError;
-    use std::sync::{mpsc, Arc};
+    use std::sync::{Arc, mpsc};
     use std::thread;
     use std::time::Duration;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -1171,9 +1171,11 @@ mod tests {
         let top_values = cardinality
             .cardinality_top_values
             .expect("cardinality payload");
-        assert!(top_values
-            .iter()
-            .any(|entry| { entry.value == "ACME" && entry.frequency == 2 }));
+        assert!(
+            top_values
+                .iter()
+                .any(|entry| { entry.value == "ACME" && entry.frequency == 2 })
+        );
         let empty_frequency = top_values
             .iter()
             .filter(|entry| entry.value == "<EMPTY>" || entry.value == "<NULL>")
