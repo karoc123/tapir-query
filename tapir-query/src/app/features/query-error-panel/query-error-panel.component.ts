@@ -7,7 +7,7 @@ import { ParsedQueryError } from "../../infrastructure/error-parsing.service";
   standalone: true,
   imports: [CommonModule],
   templateUrl: "./query-error-panel.component.html",
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: "./query-error-panel.component.css",
 })
 export class QueryErrorPanelComponent {

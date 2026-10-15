@@ -8,7 +8,7 @@ import { ColumnSchema } from "../../infrastructure/tauri-contracts";
   standalone: true,
   imports: [CommonModule, DragDropModule],
   templateUrl: "./schema-sidebar.component.html",
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: "./schema-sidebar.component.css",
 })
 export class SchemaSidebarComponent {

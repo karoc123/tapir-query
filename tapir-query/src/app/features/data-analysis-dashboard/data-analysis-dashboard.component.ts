@@ -13,7 +13,7 @@ interface AnalysisColumnDropPayload {
   selector: "app-data-analysis-dashboard",
   imports: [CommonModule, DragDropModule],
   templateUrl: "./data-analysis-dashboard.component.html",
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: "./data-analysis-dashboard.component.css",
 })
 export class DataAnalysisDashboardComponent {

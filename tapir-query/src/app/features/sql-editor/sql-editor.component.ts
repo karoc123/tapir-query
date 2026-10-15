@@ -4,7 +4,7 @@ import { defaultKeymap } from "@codemirror/commands";
 import { sql, SQLite } from "@codemirror/lang-sql";
 import { Compartment, EditorState, Extension } from "@codemirror/state";
 import { EditorView, keymap, placeholder as editorPlaceholder } from "@codemirror/view";
-import { AfterViewInit, Component, effect, ElementRef, HostListener, input, OnDestroy, output, signal, ViewChild, ChangeDetectionStrategy } from "@angular/core";
+import { AfterViewInit, ChangeDetectionStrategy, Component, effect, ElementRef, input, OnDestroy, output, signal, viewChild } from "@angular/core";
 import { ColumnSchema, QueryHistoryEntry } from "../../infrastructure/tauri-contracts";
 
 @Component({
@@ -12,8 +12,12 @@ import { ColumnSchema, QueryHistoryEntry } from "../../infrastructure/tauri-cont
   standalone: true,
   imports: [CommonModule],
   templateUrl: "./sql-editor.component.html",
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: "./sql-editor.component.css",
+  host: {
+    "(document:pointerdown)": "onDocumentPointerDown($event)",
+    "(document:keydown.escape)": "onEscapeKey()",
+  },
 })
 export class SqlEditorComponent implements AfterViewInit, OnDestroy {
   readonly query = input<string>("");
@@ -35,14 +39,9 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy {
     numeric: "auto",
   });
 
-  @ViewChild("editorHost", { static: true })
-  private readonly editorHost?: ElementRef<HTMLDivElement>;
-
-  @ViewChild("historyMenu")
-  private readonly historyMenu?: ElementRef<HTMLDivElement>;
-
-  @ViewChild("historyTrigger")
-  private readonly historyTrigger?: ElementRef<HTMLButtonElement>;
+  private readonly editorHost = viewChild<ElementRef<HTMLDivElement>>("editorHost");
+  private readonly historyMenu = viewChild<ElementRef<HTMLDivElement>>("historyMenu");
+  private readonly historyTrigger = viewChild<ElementRef<HTMLButtonElement>>("historyTrigger");
 
   private readonly sqlCompartment = new Compartment();
   private readonly editableCompartment = new Compartment();
@@ -113,7 +112,7 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy {
   });
 
   ngAfterViewInit(): void {
-    const host = this.editorHost?.nativeElement;
+    const host = this.editorHost()?.nativeElement;
     if (!host) {
       return;
     }
@@ -193,7 +192,6 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy {
     this.editorView?.focus();
   }
 
-  @HostListener("document:pointerdown", ["$event"])
   onDocumentPointerDown(event: PointerEvent): void {
     if (!this.historyMenuOpen()) {
       return;
@@ -204,8 +202,8 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy {
       return;
     }
 
-    const menuElement = this.historyMenu?.nativeElement;
-    const triggerElement = this.historyTrigger?.nativeElement;
+    const menuElement = this.historyMenu()?.nativeElement;
+    const triggerElement = this.historyTrigger()?.nativeElement;
     if (menuElement?.contains(target) || triggerElement?.contains(target)) {
       return;
     }
@@ -213,7 +211,6 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy {
     this.historyMenuOpen.set(false);
   }
 
-  @HostListener("document:keydown.escape")
   onEscapeKey(): void {
     this.historyMenuOpen.set(false);
   }
@@ -247,7 +244,7 @@ export class SqlEditorComponent implements AfterViewInit, OnDestroy {
   }
 
   isHistoryEntryActive(entry: QueryHistoryEntry): boolean {
-    return this.normalizeQueryForComparison(entry.sql) === this.normalizeQueryForComparison(this.currentEditorQuery());
+    return this.normalizeQueryForComparison(entry.sql) === this.normalizeQueryForComparison(this.query());
   }
 
   formatRelativeTime(executedAtUnixMs: number): string {

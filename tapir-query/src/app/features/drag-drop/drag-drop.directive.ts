@@ -1,9 +1,15 @@
-import { Directive, HostBinding, HostListener, inject, output, signal } from "@angular/core";
+import { Directive, inject, output, signal } from "@angular/core";
 import { LogService } from "../../infrastructure/log.service";
 
 @Directive({
   selector: "[tapirDragDrop]",
   standalone: true,
+  host: {
+    "[class.drag-active]": "dragActive()",
+    "(dragover)": "onDragOver($event)",
+    "(dragleave)": "onDragLeave($event)",
+    "(drop)": "onDrop($event)",
+  },
 })
 export class DragDropDirective {
   private readonly logs = inject(LogService);
@@ -13,12 +19,6 @@ export class DragDropDirective {
 
   private readonly dragActive = signal(false);
 
-  @HostBinding("class.drag-active")
-  get isDragActive(): boolean {
-    return this.dragActive();
-  }
-
-  @HostListener("dragover", ["$event"])
   onDragOver(event: DragEvent): void {
     event.preventDefault();
     if (event.dataTransfer) {
@@ -27,13 +27,11 @@ export class DragDropDirective {
     this.dragActive.set(true);
   }
 
-  @HostListener("dragleave", ["$event"])
   onDragLeave(event: DragEvent): void {
     event.preventDefault();
     this.dragActive.set(false);
   }
 
-  @HostListener("drop", ["$event"])
   onDrop(event: DragEvent): void {
     event.preventDefault();
     this.dragActive.set(false);

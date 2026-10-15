@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ScrollingModule } from "@angular/cdk/scrolling";
-import { afterRenderEffect, Component, computed, ElementRef, HostListener, inject, input, output, signal, ChangeDetectionStrategy } from "@angular/core";
+import { afterRenderEffect, ChangeDetectionStrategy, Component, computed, ElementRef, inject, input, output, signal } from "@angular/core";
 import { PerfService } from "../../infrastructure/perf.service";
 import { QueryRow } from "../../infrastructure/tauri-contracts";
 import type { FilterIntent, FilterOperator } from "../../domain/sql-generator.service";
@@ -40,8 +40,12 @@ const FILTER_OPERATOR_OPTIONS: FilterOperatorOption[] = [
   standalone: true,
   imports: [CommonModule, ScrollingModule],
   templateUrl: "./data-table.component.html",
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: "./data-table.component.css",
+  host: {
+    "(document:pointerdown)": "onDocumentPointerDown($event)",
+    "(document:keydown.escape)": "onEscapeKey()",
+  },
 })
 export class DataTableComponent {
   private readonly perf = inject(PerfService);
@@ -193,7 +197,6 @@ export class DataTableComponent {
     return this.sortColumn() === column && this.sortDirection() === direction;
   }
 
-  @HostListener("document:pointerdown", ["$event"])
   onDocumentPointerDown(event: PointerEvent): void {
     if (this.filterEditorDraft() === null) {
       return;
@@ -211,7 +214,6 @@ export class DataTableComponent {
     this.filterEditorDraft.set(null);
   }
 
-  @HostListener("document:keydown.escape")
   onEscapeKey(): void {
     if (this.filterEditorDraft() !== null) {
       this.filterEditorDraft.set(null);

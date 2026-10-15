@@ -8,7 +8,7 @@ import { LogEntry } from "../../infrastructure/log.service";
   standalone: true,
   imports: [CommonModule],
   templateUrl: "./grid-status-overlay.component.html",
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: "./grid-status-overlay.component.css",
 })
 export class GridStatusOverlayComponent {

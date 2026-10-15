@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, input, output, signal, ChangeDetectionStrategy } from "@angular/core";
+import { ChangeDetectionStrategy, Component, inject, input, output, signal } from "@angular/core";
 import { LogService } from "../../infrastructure/log.service";
 
 @Component({
@@ -7,7 +7,7 @@ import { LogService } from "../../infrastructure/log.service";
   standalone: true,
   imports: [CommonModule],
   templateUrl: "./file-picker.component.html",
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: "./file-picker.component.css",
 })
 export class FilePickerComponent {
@@ -18,7 +18,7 @@ export class FilePickerComponent {
 
   readonly opening = signal(false);
 
-  constructor(private readonly logs: LogService) {}
+  private readonly logs = inject(LogService);
 
   async selectCsvFile(): Promise<void> {
     if (this.disabled() || this.opening()) {

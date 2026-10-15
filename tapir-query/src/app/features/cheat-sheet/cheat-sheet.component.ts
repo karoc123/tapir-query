@@ -12,7 +12,7 @@ interface CheatItem {
   standalone: true,
   imports: [CommonModule],
   templateUrl: "./cheat-sheet.component.html",
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: "./cheat-sheet.component.css",
 })
 export class CheatSheetComponent {

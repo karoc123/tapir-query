@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { afterNextRender, Component, computed, effect, inject, OnDestroy, signal, untracked, ViewChild, ChangeDetectionStrategy } from "@angular/core";
+import { afterNextRender, ChangeDetectionStrategy, Component, computed, effect, inject, OnDestroy, signal, untracked, viewChild } from "@angular/core";
 import { DataAnalysisPluginService } from "./domain/data-analysis-plugin.service";
 import { DatasetMetricsService } from "./domain/dataset-metrics.service";
 import { FileService } from "./domain/file.service";
@@ -40,7 +40,7 @@ import { AppTheme, ThemeService } from "./infrastructure/theme.service";
     SqlEditorComponent,
   ],
   templateUrl: "./app.component.html",
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: "./app.component.css",
 })
 export class AppComponent implements OnDestroy {
@@ -58,8 +58,7 @@ export class AppComponent implements OnDestroy {
 
   private readonly unlistenNativeDropEvents: Array<() => void> = [];
 
-  @ViewChild(SqlEditorComponent)
-  private readonly sqlEditor?: SqlEditorComponent;
+  private readonly sqlEditor = viewChild(SqlEditorComponent);
 
   readonly loading = this.queryService.loading;
   readonly currentFilePath = this.fileService.currentFilePath;
@@ -660,13 +659,13 @@ export class AppComponent implements OnDestroy {
   private focusQueryEditorSoon(): void {
     if (typeof requestAnimationFrame === "function") {
       requestAnimationFrame(() => {
-        this.sqlEditor?.focusEditor();
+        this.sqlEditor()?.focusEditor();
       });
       return;
     }
 
     setTimeout(() => {
-      this.sqlEditor?.focusEditor();
+      this.sqlEditor()?.focusEditor();
     }, 0);
   }
 

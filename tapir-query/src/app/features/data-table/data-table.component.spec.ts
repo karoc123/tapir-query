@@ -1,4 +1,4 @@
-import { TestBed } from "@angular/core/testing";
+import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { DataTableComponent } from "./data-table.component";
 
 describe("DataTableComponent", () => {
@@ -124,5 +124,47 @@ describe("DataTableComponent", () => {
 
     expect(popover).not.toBeNull();
     expect(popover?.classList.contains("align-start")).toBe(true);
+  });
+});
+
+describe("DataTableComponent DOM updates (OnPush)", () => {
+  let fixture: ComponentFixture<DataTableComponent>;
+
+  const host = (): HTMLElement => fixture.nativeElement as HTMLElement;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({ imports: [DataTableComponent] }).compileComponents();
+
+    fixture = TestBed.createComponent(DataTableComponent);
+    fixture.componentRef.setInput("columns", ["id", "name"]);
+    fixture.detectChanges();
+  });
+
+  it("re-renders header cells when the columns input changes", () => {
+    expect(host().querySelectorAll(".table-head-cell")).toHaveLength(2);
+
+    fixture.componentRef.setInput("columns", ["id", "name", "city"]);
+    fixture.detectChanges();
+
+    expect(host().querySelectorAll(".table-head-cell")).toHaveLength(3);
+  });
+
+  it("opens the filter editor on click and closes it on Escape", () => {
+    host().querySelector<HTMLButtonElement>(".filter-control")?.click();
+    fixture.detectChanges();
+    expect(host().querySelector(".table-head-cell.filter-open")).not.toBeNull();
+
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    fixture.detectChanges();
+    expect(host().querySelector(".table-head-cell.filter-open")).toBeNull();
+  });
+
+  it("emits a sort request when a sort control is clicked", () => {
+    const requests: unknown[] = [];
+    fixture.componentInstance.sortRequested.subscribe((request) => requests.push(request));
+
+    host().querySelector<HTMLButtonElement>(".sort-control")?.click();
+
+    expect(requests).toEqual([{ column: "id", direction: "asc" }]);
   });
 });

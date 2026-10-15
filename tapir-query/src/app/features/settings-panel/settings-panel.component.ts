@@ -7,7 +7,7 @@ import { AppTheme, ThemeOption } from "../../infrastructure/theme.service";
   standalone: true,
   imports: [CommonModule],
   templateUrl: "./settings-panel.component.html",
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: "./settings-panel.component.css",
 })
 export class SettingsPanelComponent {

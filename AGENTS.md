@@ -57,6 +57,7 @@ From `tapir-query/`:
 
 - Keep components presentational where possible.
 - Put UI transitions and business behavior in services with Signals.
+- All components use `ChangeDetectionStrategy.OnPush`: keep view state in Signals (`input()`, `signal()`, `computed()`, `viewChild()`), update state immutably, and prefer `host` metadata over `@HostBinding`/`@HostListener`.
 - Do not couple components directly to DuckDB details.
 - For error output, always render parsed summaries/context, never raw JSON payloads.
 
