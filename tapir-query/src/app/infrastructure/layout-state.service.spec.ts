@@ -70,7 +70,7 @@ describe("LayoutStateService", () => {
     expect(service.analysisPanelOpen()).toBe(true);
 
     fileService.clear();
-    TestBed.flushEffects();
+    TestBed.tick();
 
     expect(service.mode()).toBe("empty");
     expect(service.schemaCollapsed()).toBe(true);

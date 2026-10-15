@@ -9,11 +9,10 @@ describe("QueryService", () => {
   let bridgeMock: MockTauriService;
   let queryExecutionEvents: QueryExecutionEventsService;
 
-  function flushEffects(): void {
-    const maybeFlushEffects = (TestBed as unknown as { flushEffects?: () => void }).flushEffects;
-    if (typeof maybeFlushEffects === "function") {
-      maybeFlushEffects();
-    }
+  // Flushes effects, then waits one macrotask so chained persistence promises settle.
+  async function settle(): Promise<void> {
+    TestBed.tick();
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
   }
 
   beforeEach(() => {
@@ -37,8 +36,7 @@ describe("QueryService", () => {
     const historyService = TestBed.inject(HistoryService);
 
     await service.openFile("/tmp/transactions.csv");
-    flushEffects();
-    await Promise.resolve();
+    await settle();
 
     expect(historyService.entries()[0]).toEqual(
       expect.objectContaining({
@@ -53,8 +51,7 @@ describe("QueryService", () => {
     const historyService = TestBed.inject(HistoryService);
 
     await service.openFile("/tmp/transactions.csv");
-    flushEffects();
-    await Promise.resolve();
+    await settle();
 
     const baselineEntries = historyService.entries().length;
     bridgeMock.executeQueryImpl = async () => {
@@ -63,8 +60,7 @@ describe("QueryService", () => {
 
     service.updateQuery("SELECT FROM");
     await service.runQuery();
-    flushEffects();
-    await Promise.resolve();
+    await settle();
 
     expect(historyService.entries().length).toBe(baselineEntries);
     expect(historyService.entries().some((entry) => entry.sql === "SELECT FROM")).toBe(false);

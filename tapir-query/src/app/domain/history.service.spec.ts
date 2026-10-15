@@ -25,17 +25,12 @@ describe("HistoryService", () => {
   });
 
   async function flushAsyncWork(): Promise<void> {
-    const flushEffects = (TestBed as unknown as { flushEffects?: () => void }).flushEffects;
-    if (typeof flushEffects === "function") {
-      flushEffects();
-    }
+    TestBed.tick();
 
     await Promise.resolve();
     await Promise.resolve();
 
-    if (typeof flushEffects === "function") {
-      flushEffects();
-    }
+    TestBed.tick();
   }
 
   it("deduplicates history and moves repeated query to top", async () => {
