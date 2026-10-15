@@ -55,7 +55,7 @@ cargo test
 ## Notes
 
 - The frontend uses Standalone Angular components and Signals.
-- Frontend dependencies are migrated to Angular 21.
+- Frontend dependencies are migrated to Angular 22 (TypeScript is pinned to 6.0.x, as required by Angular 22).
 - IPC access is isolated in `src/app/infrastructure/tauri-bridge.service.ts`.
 - UI orchestration lives in `src/app/domain/file.service.ts` and `src/app/domain/query.service.ts`.
 - Backend command handlers are in `src-tauri/src/commands`, orchestration in `src-tauri/src/domain`, and DuckDB engine code in `src-tauri/src/engine`.

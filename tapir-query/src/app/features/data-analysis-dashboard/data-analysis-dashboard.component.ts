@@ -1,6 +1,6 @@
 import { DragDropModule } from "@angular/cdk/drag-drop";
 import { CommonModule } from "@angular/common";
-import { Component, input, output, signal } from "@angular/core";
+import { Component, input, output, signal, ChangeDetectionStrategy } from "@angular/core";
 import { CardinalityMetricView, ColumnAnalysisProfile } from "../../domain/data-analysis-plugin.service";
 import { ColumnSchema, CompletenessAudit, StringLengthHistogram } from "../../infrastructure/tauri-contracts";
 
@@ -13,6 +13,7 @@ interface AnalysisColumnDropPayload {
   selector: "app-data-analysis-dashboard",
   imports: [CommonModule, DragDropModule],
   templateUrl: "./data-analysis-dashboard.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./data-analysis-dashboard.component.css",
 })
 export class DataAnalysisDashboardComponent {

@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, input, output } from "@angular/core";
+import { Component, input, output, ChangeDetectionStrategy } from "@angular/core";
 
 interface CheatItem {
   title: string;
@@ -12,6 +12,7 @@ interface CheatItem {
   standalone: true,
   imports: [CommonModule],
   templateUrl: "./cheat-sheet.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./cheat-sheet.component.css",
 })
 export class CheatSheetComponent {

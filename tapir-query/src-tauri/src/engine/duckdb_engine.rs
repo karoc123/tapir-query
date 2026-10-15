@@ -502,8 +502,12 @@ impl CsvQueryEngine for DuckDbEngine {
             debug!("execute_query_chunk describing query schema");
             let columns = self.describe_query_schema(connection, &normalized_sql)?;
 
-            let paged_sql =
-                sql_builder::build_paged_select_sql(&normalized_sql, &columns, bounded_limit + 1, offset);
+            let paged_sql = sql_builder::build_paged_select_sql(
+                &normalized_sql,
+                &columns,
+                bounded_limit + 1,
+                offset,
+            );
             debug!("execute_query_chunk preparing paged query");
             let mut statement = connection
                 .prepare(&paged_sql)

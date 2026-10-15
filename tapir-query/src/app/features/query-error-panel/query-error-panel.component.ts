@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, input } from "@angular/core";
+import { Component, input, ChangeDetectionStrategy } from "@angular/core";
 import { ParsedQueryError } from "../../infrastructure/error-parsing.service";
 
 @Component({
@@ -7,6 +7,7 @@ import { ParsedQueryError } from "../../infrastructure/error-parsing.service";
   standalone: true,
   imports: [CommonModule],
   templateUrl: "./query-error-panel.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./query-error-panel.component.css",
 })
 export class QueryErrorPanelComponent {

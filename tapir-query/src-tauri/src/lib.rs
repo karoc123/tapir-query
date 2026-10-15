@@ -104,7 +104,14 @@ fn init_tracing(app_handle: &AppHandle) {
 
 fn create_runtime_log_writer(
     app_handle: &AppHandle,
-) -> Result<(tracing_appender::non_blocking::NonBlocking, WorkerGuard, PathBuf), String> {
+) -> Result<
+    (
+        tracing_appender::non_blocking::NonBlocking,
+        WorkerGuard,
+        PathBuf,
+    ),
+    String,
+> {
     let log_path = resolve_runtime_log_path(app_handle)?;
     let log_directory = log_path.parent().ok_or_else(|| {
         format!(
@@ -129,7 +136,12 @@ pub(crate) fn resolve_runtime_log_path(app_handle: &AppHandle) -> Result<PathBuf
     let log_dir = app_handle
         .path()
         .app_log_dir()
-        .or_else(|_| app_handle.path().app_data_dir().map(|directory| directory.join("logs")))
+        .or_else(|_| {
+            app_handle
+                .path()
+                .app_data_dir()
+                .map(|directory| directory.join("logs"))
+        })
         .map_err(|error| format!("failed to resolve runtime log directory: {error}"))?;
 
     Ok(log_dir.join(RUNTIME_LOG_FILE_NAME))
@@ -142,7 +154,14 @@ fn install_panic_hook() {
         std::panic::set_hook(Box::new(move |panic_info| {
             let location = panic_info
                 .location()
-                .map(|location| format!("{}:{}:{}", location.file(), location.line(), location.column()))
+                .map(|location| {
+                    format!(
+                        "{}:{}:{}",
+                        location.file(),
+                        location.line(),
+                        location.column()
+                    )
+                })
                 .unwrap_or_else(|| String::from("unknown"));
             let payload = if let Some(message) = panic_info.payload().downcast_ref::<&str>() {
                 (*message).to_string()

@@ -1,6 +1,6 @@
 import { CommonModule } from "@angular/common";
 import { ScrollingModule } from "@angular/cdk/scrolling";
-import { afterRenderEffect, Component, computed, ElementRef, HostListener, inject, input, output, signal } from "@angular/core";
+import { afterRenderEffect, Component, computed, ElementRef, HostListener, inject, input, output, signal, ChangeDetectionStrategy } from "@angular/core";
 import { PerfService } from "../../infrastructure/perf.service";
 import { QueryRow } from "../../infrastructure/tauri-contracts";
 import type { FilterIntent, FilterOperator } from "../../domain/sql-generator.service";
@@ -40,6 +40,7 @@ const FILTER_OPERATOR_OPTIONS: FilterOperatorOption[] = [
   standalone: true,
   imports: [CommonModule, ScrollingModule],
   templateUrl: "./data-table.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./data-table.component.css",
 })
 export class DataTableComponent {

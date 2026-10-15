@@ -15,7 +15,7 @@ Core objectives:
 
 ```mermaid
 flowchart LR
-  UI[Angular 21 UI<br/>Standalone Components + Signals] --> Domain[Domain Services<br/>FileService / QueryService / HistoryService / DatasetMetricsService / DataAnalysisPluginService]
+  UI[Angular 22 UI<br/>Standalone Components + Signals] --> Domain[Domain Services<br/>FileService / QueryService / HistoryService / DatasetMetricsService / DataAnalysisPluginService]
   Domain --> Bridge[TauriBridgeService<br/>Typed invoke wrapper]
   Bridge --> Cmd[Tauri Commands<br/>open_file / execute_query / run_column_profile_metric / start_query_session / read_query_session_chunk / close_query_session / load_query_history / save_query_history / export_csv / export_rows]
   Cmd --> Svc[CsvQueryService]
@@ -97,7 +97,7 @@ src-tauri/src/
 
 All command handlers are async wrappers around blocking work.
 
-## 4. Frontend Architecture (Angular 21 + Signals)
+## 4. Frontend Architecture (Angular 22 + Signals)
 
 ### 4.1 Module Layout
 

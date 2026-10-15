@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { afterNextRender, Component, computed, effect, inject, OnDestroy, signal, untracked, ViewChild } from "@angular/core";
+import { afterNextRender, Component, computed, effect, inject, OnDestroy, signal, untracked, ViewChild, ChangeDetectionStrategy } from "@angular/core";
 import { DataAnalysisPluginService } from "./domain/data-analysis-plugin.service";
 import { DatasetMetricsService } from "./domain/dataset-metrics.service";
 import { FileService } from "./domain/file.service";
@@ -40,6 +40,7 @@ import { AppTheme, ThemeService } from "./infrastructure/theme.service";
     SqlEditorComponent,
   ],
   templateUrl: "./app.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./app.component.css",
 })
 export class AppComponent implements OnDestroy {

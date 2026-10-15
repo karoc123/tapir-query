@@ -4,7 +4,7 @@ This file is the operating guide for coding agents working in this repository.
 
 ## Session Snapshot (April 2026)
 
-- Frontend is Angular 21 + Signals, backend is Tauri v2 + Rust + DuckDB.
+- Frontend is Angular 22 + Signals, backend is Tauri v2 + Rust + DuckDB.
 - Phase 5 context-first UI is in place:
   - Empty mode: centered drop zone + Browse Files CTA only.
   - Loaded mode: Zone A action bar, Zone B collapsible schema sidebar, Zone C data grid, Zone D status bar.

@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, input, output } from "@angular/core";
+import { Component, input, output, ChangeDetectionStrategy } from "@angular/core";
 import { AppTheme, ThemeOption } from "../../infrastructure/theme.service";
 
 @Component({
@@ -7,6 +7,7 @@ import { AppTheme, ThemeOption } from "../../infrastructure/theme.service";
   standalone: true,
   imports: [CommonModule],
   templateUrl: "./settings-panel.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./settings-panel.component.css",
 })
 export class SettingsPanelComponent {

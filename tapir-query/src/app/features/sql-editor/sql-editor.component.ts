@@ -4,7 +4,7 @@ import { defaultKeymap } from "@codemirror/commands";
 import { sql, SQLite } from "@codemirror/lang-sql";
 import { Compartment, EditorState, Extension } from "@codemirror/state";
 import { EditorView, keymap, placeholder as editorPlaceholder } from "@codemirror/view";
-import { AfterViewInit, Component, effect, ElementRef, HostListener, input, OnDestroy, output, signal, ViewChild } from "@angular/core";
+import { AfterViewInit, Component, effect, ElementRef, HostListener, input, OnDestroy, output, signal, ViewChild, ChangeDetectionStrategy } from "@angular/core";
 import { ColumnSchema, QueryHistoryEntry } from "../../infrastructure/tauri-contracts";
 
 @Component({
@@ -12,6 +12,7 @@ import { ColumnSchema, QueryHistoryEntry } from "../../infrastructure/tauri-cont
   standalone: true,
   imports: [CommonModule],
   templateUrl: "./sql-editor.component.html",
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: "./sql-editor.component.css",
 })
 export class SqlEditorComponent implements AfterViewInit, OnDestroy {
